@@ -1,51 +1,52 @@
-# ueLights
+<p align="center">
+  <img src="docs/images/hero.png" alt="ueLights – StreamElements-Alerts als Lichtshow auf Twinkly, Govee, amaran und Home Assistant" width="100%">
+</p>
 
-**StreamElements-Alerts → Lichtshow – komplett lokal.**
-ueLights empfängt Spenden, Bits, Subs, Raids, Kanalpunkte und Chat-Befehle von StreamElements und steuert damit Twinkly-, Govee- und amaran-Lichter sowie alles, was in Home Assistant hängt. Einzige Verbindung nach außen ist der WebSocket zu StreamElements; alle Lichter werden über das lokale Netz angesprochen.
+<p align="center">
+  <a href="https://github.com/Intracy/ueLights/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Intracy/ueLights/actions/workflows/ci.yml/badge.svg"></a>
+  <img alt="Node 20+" src="https://img.shields.io/badge/node-20%2B-3de0e8?logo=nodedotjs&logoColor=white">
+  <img alt="Docker" src="https://img.shields.io/badge/docker-ready-b794ff?logo=docker&logoColor=white">
+  <img alt="Windows" src="https://img.shields.io/badge/windows-1--Klick--Start-b794ff?logo=windows&logoColor=white">
+  <img alt="100 % lokal" src="https://img.shields.io/badge/lichter-100%25%20lokal-7cf29c">
+  <a href="LICENSE"><img alt="MIT" src="https://img.shields.io/badge/lizenz-MIT-ece8f5"></a>
+</p>
 
-![Stack](https://img.shields.io/badge/stack-Node%2022%20%C2%B7%20Fastify%20%C2%B7%20React%20%C2%B7%20Vite-7c4dff) ![Design](https://img.shields.io/badge/design-Material%203%20%C2%B7%20Schwarz--Violett-3de0e8)
+<p align="center">
+  <b>Spenden, Bits, Subs, Raids und Kanalpunkte aus StreamElements lösen echte Lichtshows aus –<br>
+  auf Twinkly, Govee, amaran und allem, was in Home Assistant hängt. Automatisch, in Stufen, ohne Cloud.</b>
+</p>
+
+<p align="center">
+  <a href="#-schnellstart">Schnellstart</a> ·
+  <a href="#-funktionen">Funktionen</a> ·
+  <a href="#-screenshots">Screenshots</a> ·
+  <a href="#-lichter-einrichten">Lichter einrichten</a> ·
+  <a href="#-so-funktioniert-es">Architektur</a> ·
+  <a href="#-roadmap">Roadmap</a>
+</p>
 
 ---
 
-## Funktionen
+## ✨ Auf einen Blick
 
-| Bereich | Was geht |
-| --- | --- |
-| **Auslösung** | **Automatisch** (Standard): eingehende StreamElements-Alerts lösen die Lichter sofort aus. **Manuell**: passende Alerts warten im Live-Feed auf *Freigeben* / *Verwerfen*. Umschalter oben rechts; jeder Alert kann die globale Einstellung übersteuern |
-| **Trigger** | Alle StreamElements-Aktivitäten: Spende (Tip), Bits, Sub/Resub, Gift-Subs (Gift-Bomben gebündelt), Raid, Follow, Kanalpunkte, Chat-Nachrichten/-Befehle, Superchat, Merch, Hype-Train |
-| **Bedingungen** | Betrag *genau / von–bis / ab*, Stufen nach Betrag (5 € → Alert A, 10 € → Alert B …), Text in der Nachricht, Kanalpunkte-Belohnung, Plattform, Sub-Stufe, Testevents ja/nein |
-| **Alert-Builder** | Beliebig viele Alerts; je Alert/Stufe beliebig viele **Licht-Spuren** (Licht oder Gruppe + Effekt + Startversatz + Dauer) mit Zeitleiste |
-| **Effekte** | Eigene Effekte (Statisch, Puls, Strobe, Farbwechsel, Regenbogen, Lauflicht, Füllstand, Überblenden) mit Live-Vorschau; **Hersteller-Effekte** aus den Apps (Twinkly-Movies/Playlists, Govee-Szenen, amaran-Effekte/Presets/Szenen, Home-Assistant-Effekte/-Szenen/-Skripte) |
-| **Betrag als Parameter** | Helligkeit, Füllstand oder Dauer wachsen mit der Spende/den Bits |
-| **Farbe aus dem Chat** | „Farbe aus Nachricht“: Kanalpunkte „Farbe wählen: blau“ oder `!farbe #ff00ff` färbt die Lichter (Farbwort-Liste + Hex) |
-| **Lichter** | Twinkly (xled, Echtzeit pro LED), Govee (LAN-API + Szenen per ptReal), amaran (amaran Desktop), Home Assistant, Webhook, **virtuelle Lichter** zum Testen ohne Hardware |
-| **Gruppen** | Lichter verschiedener Hersteller zusammenfassen |
-| **Ruhezustand** | Je Licht: wie vorher (Snapshot), aus, feste Farbe oder Hersteller-Effekt |
-| **Sicherheit** | Flacker-Schutz (max. Blitze/s, Standard 3), Bildlicht-Sperre, Ruhezeiten, Pause, **Alles stoppen**, alte Events nach Reconnect verwerfen, Warteschlangen-Limit, Login |
-| **Live** | Live-Feed mit Status, „läuft gerade“ mit Fortschritt, Warteschlange, erneut abspielen, Testevents, Vorschau virtueller Lichter |
-| **Sonstiges** | Backup/Import als JSON (ohne Geheimnisse), PWA fürs iPad/iPhone, Dark-Theme nach Material 3 |
+<p align="center">
+  <img src="docs/images/live-leds.gif" alt="Ein Spenden-Alert läuft live auf zwei virtuellen LED-Streifen" width="820">
+</p>
 
-## Architektur
+- **5 € → Puls, 10 € → Party, ab 50 € → alles:** Betragsstufen für Spenden, Bits, Gift-Subs und Raids, jede mit eigener Lichtshow.
+- **Mehrere Hersteller in einem Alert:** Twinkly-Effekt, Govee-Szene und amaran-Blitz zeitversetzt auf einer gemeinsamen Zeitleiste.
+- **Fertige Effekte aus den Hersteller-Apps:** Twinkly-Movies, Govee-App-Szenen, amaran-Effekte und Home-Assistant-Szenen direkt auswählbar, ohne sie nachzubauen.
+- **Komplett lokal:** Die einzige Verbindung nach außen ist der WebSocket zu StreamElements, und den baut ueLights selbst auf. Keine Hersteller-Cloud, keine API-Keys, keine Portfreigabe.
+- **Automatisch oder auf Freigabe:** Standardmäßig lösen eingehende Alerts sofort aus. Auf Knopfdruck warten sie im Live-Feed auf dein OK.
+- **Sicher im Stream:** Flacker-Schutz, Sperre für Bildlicht, Pause, Ruhezeiten und ein großer **Alles stoppen**-Knopf.
 
-```
-StreamElements Astro (wss, ausgehend)
-        │  channel.activities · channel.chat.message · (channel.tips)
-        ▼
-┌──────────────── ueLights-Server (Docker auf dem NAS) ────────────────┐
-│ Normalisieren → Duplikate/Gift-Bomben → Alert-Engine → Warteschlange │
-│                     (Stufen, Priorität, Cooldown)    → Player        │
-│                                                        │             │
-│   Twinkly  ·  Govee LAN  ·  amaran Desktop  ·  Home Assistant  ·  Webhook  ·  virtuell
-└────────────────────────────────────────────────────────┬─────────────┘
-                                                         │ REST + WebSocket
-                                              Web-App (Browser / PWA)
-```
+## 🚀 Schnellstart
 
-* `packages/shared` – Typen, Effekt-Renderer, Stufen-Logik (läuft im Server **und** im Browser für die Vorschau)
-* `server` – Fastify, StreamElements-Client, Engine, Konnektoren, JSON-Datenhaltung
-* `web` – React + Vite, Material 3 Schwarz-Violett
+<table>
+<tr>
+<td width="33%" valign="top">
 
-## Schnellstart (Synology NAS / Docker)
+**🐳 Docker / Synology NAS**
 
 ```bash
 git clone https://github.com/Intracy/ueLights.git
@@ -53,108 +54,211 @@ cd ueLights
 docker compose up -d --build
 ```
 
-Dann `http://<NAS-IP>:8787` öffnen, Passwort festlegen, fertig. Von unterwegs z. B. per Tailscale.
+→ `http://<NAS-IP>:8787`
 
-> **Warum `network_mode: host`?** Die Gerätesuche von Twinkly (UDP-Broadcast) und Govee (Multicast 239.255.255.250:4001, Antworten auf Port 4002) funktioniert nur im Host-Netz. Wer feste IPs einträgt und Govee nicht nutzt, kann auch mit Port-Freigabe `8787:8787` arbeiten.
+</td>
+<td width="33%" valign="top">
 
-Synology DSM: *Container Manager → Projekt → Erstellen*, Ordner mit dem Repo wählen, `docker-compose.yml` übernehmen.
+**🪟 Windows**
 
-### Windows (ohne Docker)
+1. Repo als ZIP laden und entpacken
+2. **`ueLights-starten.bat`** doppelklicken
 
-Gut geeignet, wenn amaran Desktop auf demselben PC läuft – dann reicht `ws://localhost:33782/ws`.
+Das Skript installiert Node.js bei Bedarf über `winget`, baut die App und öffnet den Browser. Autostart über `windows\autostart-einrichten.ps1`.
 
-1. Repo als ZIP laden (GitHub → *Code → Download ZIP*) und entpacken – oder `git clone`.
-2. **`ueLights-starten.bat`** doppelklicken.
-   * Fehlt Node.js 20+, bietet das Skript die Installation per `winget` an.
-   * Beim ersten Start werden Abhängigkeiten installiert und die App gebaut (einige Minuten), danach startet sie in Sekunden. Nach Code-Änderungen baut das Skript automatisch neu.
-   * Der Browser öffnet `http://localhost:8787`. Beenden mit Strg+C.
-3. Windows fragt beim ersten Start nach der Firewall: **Private Netzwerke zulassen** (für Zugriff vom Handy und für Govee).
+</td>
+<td width="33%" valign="top">
 
-| Skript | Zweck |
-| --- | --- |
-| `ueLights-starten.bat` | Starten im Fenster (Optionen: `-Port 8788`, `-Rebuild`, `-NoBrowser`) |
-| `windows\autostart-einrichten.ps1` | Start bei jeder Windows-Anmeldung, unsichtbar, mit Neustart bei Absturz. `-Firewall` (als Admin) legt Regeln für TCP 8787 und UDP 4002 an |
-| `windows\autostart-entfernen.ps1` | Autostart entfernen und Hintergrund-Server beenden |
-| `windows\update.ps1` | `git pull`, neu bauen, Autostart neu starten |
-
-PowerShell-Skripte per Rechtsklick → *Mit PowerShell ausführen*. Daten liegen in `%LOCALAPPDATA%\ueLights`, Logs des Hintergrundbetriebs in `%LOCALAPPDATA%\ueLights\logs\uelights.log`.
-
-### Ohne Docker (Linux/macOS)
+**🧪 Ausprobieren ohne Hardware**
 
 ```bash
 npm install
 npm run build
-npm start                 # http://localhost:8787
+npm run demo
 ```
 
-Entwicklung: `npm run dev` (Server auf 8787 mit Auto-Reload, Vite auf 5173 mit Proxy).
+→ `http://localhost:8787` mit Demo-Lichtern, -Alerts und virtuellen LED-Streifen.
 
-## Einrichtung
+</td>
+</tr>
+</table>
 
-### 1. StreamElements
-1. StreamElements-Dashboard → Avatar oben rechts → Kanal → **Show secrets** → **JWT Token** kopieren.
-2. In ueLights → *Einstellungen → StreamElements* einfügen, „Verbindung aktiv“ einschalten, speichern.
-3. Die Kanal-ID wird aus dem Token gelesen. Status oben rechts wird grün.
+Beim ersten Öffnen legst du ein Passwort fest. Danach in **Einstellungen → StreamElements** das JWT-Token eintragen (Dashboard → Avatar → Kanal → *Show secrets*) und unter **Lichter** die Geräte hinzufügen.
 
-Der Token liegt nur in `data/store.json` auf dem NAS (Dateirechte 600) und wird nie an den Browser zurückgegeben. Alternativ per Umgebungsvariable `SE_JWT`.
+## 🧩 Funktionen
 
-**Testen:** Auf der Live-Seite Testevents auslösen – oder im StreamElements-Dashboard unter *Activity Feed → Emulate*. Damit Alerts auf Testevents reagieren, muss „Testevents zulassen“ im Alert aktiv sein.
+| | |
+| --- | --- |
+| **⚡ Auslösung** | **Automatisch** (Standard): Eingehende StreamElements-Events lösen sofort aus. **Manuell**: Alerts warten im Live-Feed auf *Freigeben* oder *Verwerfen*. Umschalter oben rechts, pro Alert übersteuerbar. |
+| **🎯 Trigger** | Spende (Tip), Bits, Sub/Resub, Gift-Subs (Gift-Bomben werden gebündelt), Raid, Follow, Kanalpunkte, Chat-Nachrichten und -Befehle, Superchat, Merch, Hype-Train |
+| **🪜 Bedingungen & Stufen** | Betrag *genau / von–bis / ab*, beliebig viele Stufen mit Prüfung auf Lücken und Überschneidungen, Text in der Nachricht, Kanalpunkte-Belohnung, Plattform, Sub-Stufe, Testevents an/aus. Ein exakter Betrag (z. B. 13,37 €) schlägt jeden Bereich. |
+| **🎬 Alert-Builder** | Beliebig viele Alerts. Pro Alert bzw. Stufe beliebig viele **Licht-Spuren** (Licht oder Gruppe + Effekt + Start + Dauer) auf einer Zeitleiste. Priorität per Reihenfolge, Cooldown, „zusätzlich ausführen“. |
+| **🌈 Eigene Effekte** | Statisch, Puls, Strobe, Farbwechsel, Regenbogen, Lauflicht, Füllstand, Überblenden, mit Live-Vorschau im Browser. Derselbe Renderer läuft auf dem Server, die Vorschau entspricht also genau dem, was die Lichter zeigen. |
+| **🏭 Hersteller-Effekte** | Twinkly-Movies, Playlists und eingebaute Effekte · Govee-App-Szenen (lokal per `ptReal`) · amaran-Effekte, Presets und Szenen · Home-Assistant-Effekte, Szenen und Skripte |
+| **💶 Betrag als Parameter** | Helligkeit, Füllstand oder Dauer wachsen mit der Höhe der Spende oder der Bits |
+| **🎨 Farbe aus dem Chat** | Kanalpunkte „Farbe wählen: blau“ oder `!farbe #ff00ff` färben die Lichter (Farbwörter auf Deutsch/Englisch und Hex) |
+| **💡 Lichter** | Twinkly (Echtzeit pro LED), Govee LAN, amaran Desktop, Home Assistant, Webhook, **virtuelle Lichter** zum Testen. Gerätesuche im Netz, Gruppen über Hersteller hinweg, Ruhezustand je Licht (wie vorher / aus / Farbe / Hersteller-Effekt). |
+| **🛡️ Sicherheit** | Flacker-Schutz (Standard: max. 3 Blitze/s), Bildlicht-Sperre, Ruhezeiten, Pause, Alles stoppen, Verwerfen alter Events nach einem Reconnect, Limit für die Warteschlange, Login mit Passwort |
+| **📡 Live** | Feed mit Status je Event, Anzeige „läuft gerade“ mit Fortschritt, Warteschlange, erneut abspielen, Testevents mit einem Klick, virtuelle LED-Streifen |
+| **🧰 Betrieb** | Docker/Compose, Windows-Skripte mit Autostart und Update, PWA fürs iPad/iPhone, Backup/Import als JSON (ohne Geheimnisse), CI mit Tests |
 
-### 2. Lichter
+## 📸 Screenshots
 
-#### Twinkly (Strings HD u. a.)
-* Kette in der Twinkly-App ins WLAN bringen, IP im Router fest reservieren.
-* *Lichter → Licht hinzufügen → Twinkly* → **Suchen** oder IP eintragen → **Prüfen** zeigt Modell, LED-Anzahl, RGB/RGBW.
-* **Hersteller-Effekte:** In der Twinkly-App die gewünschten Effekte in die **Playlist** der Kette legen – nur dann liegen sie auf dem Controller. Danach *Effekte → Hersteller → Neu einlesen*.
-* Eigene Effekte laufen in Echtzeit pro LED (UDP 7777). Sind die Farben vertauscht, unter „Farbkanäle“ eine andere Reihenfolge wählen (die Strings HD sind RGBW – ob `WRGB` oder `RGBW` passt, zeigt der erste Test).
-* Hinweis: Die xled-API ist **inoffiziell** (Reverse Engineering). Twinkly-Firmware-Updates können sie ändern.
+### Live: was gerade passiert
 
-Schnelltest ohne ueLights: `curl http://<IP>/xled/v1/gestalt` muss JSON liefern.
+<img src="docs/images/live.png" alt="Live-Seite mit laufendem Alert, virtuellen LED-Streifen und Event-Feed">
 
-#### Govee
-* In der Govee-Home-App je Gerät **LAN Control** einschalten (nur Modelle von Govees LAN-Liste).
-* Im Netz müssen UDP 4001 (Multicast), 4002 (Antwort) und 4003 (Befehle) durchgehen. Port **4002** darf auf dem Host nicht belegt sein – also nicht parallel Home Assistant „Govee lights local“ auf demselben Rechner betreiben.
-* Lokal (offiziell): an/aus, Helligkeit, Farbe. Eigene Effekte laufen als gedrosselte Farbfolge (Standard 5 Befehle/s).
-* **App-Szenen lokal (inoffiziell):** Govee-Geräte können ihre Szenen nicht auflisten. Den Szenen-Katalog deines Modells einmal als JSON besorgen und unter *Effekte → Hersteller → Szenen importieren* einfügen. Ausgelöst wird lokal per `ptReal` (dasselbe Protokoll wie die App). Unterstützte Formate:
+### Alert-Builder: Stufen und Licht-Spuren
+
+<img src="docs/images/builder.png" alt="Alert-Builder mit Spenden-Stufen und Zeitleiste der Licht-Spuren">
+
+<table>
+<tr>
+<td width="50%"><b>Alerts</b><br><img src="docs/images/alerts.png" alt="Alert-Liste"></td>
+<td width="50%"><b>Manueller Modus: Freigabe</b><br><img src="docs/images/manual.png" alt="Alerts warten auf Freigabe"></td>
+</tr>
+<tr>
+<td><b>Eigene Effekte mit Live-Vorschau</b><br><img src="docs/images/effects.png" alt="Effekt-Bibliothek"></td>
+<td><b>Effekt-Editor (Betrag als Parameter)</b><br><img src="docs/images/effect-editor.png" alt="Effekt-Editor"></td>
+</tr>
+<tr>
+<td><b>Hersteller-Effekte</b><br><img src="docs/images/native.png" alt="Hersteller-Effekte von Twinkly, Govee, amaran und Home Assistant"></td>
+<td><b>Lichter</b><br><img src="docs/images/lights.png" alt="Lichter-Verwaltung"></td>
+</tr>
+<tr>
+<td colspan="2"><b>Einstellungen</b><br><img src="docs/images/settings.png" alt="Einstellungen"></td>
+</tr>
+</table>
+
+### Am Handy (PWA)
+
+<p align="center"><img src="docs/images/mobile.png" alt="ueLights auf dem Handy: Live, Alerts, Lichter" width="820"></p>
+
+> Alle Screenshots stammen aus dem Demo-Modus (`npm run demo`). Namen und Beträge sind Beispieldaten.
+
+## 🔧 So funktioniert es
+
+```mermaid
+flowchart LR
+  SE["StreamElements<br/>Astro WebSocket"] -- "Spenden · Bits · Subs<br/>Raids · Kanalpunkte · Chat" --> N
+  subgraph S["ueLights-Server · Docker / Windows"]
+    N["Normalisieren<br/>Duplikate · Gift-Bomben<br/>Währung"] --> E["Alert-Engine<br/>Stufen · Priorität · Cooldown<br/>Automatisch / Manuell"]
+    E --> Q["Warteschlange"] --> P["Player<br/>Effekt-Renderer<br/>Flacker-Schutz"]
+  end
+  P -- "HTTP + UDP 7777" --> TW["Twinkly"]
+  P -- "UDP 4003 · ptReal" --> GV["Govee LAN"]
+  P -- "WebSocket 33782" --> AM["amaran Desktop"]
+  P -- "WebSocket" --> HA["Home Assistant"]
+  P -- "HTTP POST" --> WH["Webhook"]
+  S <-- "REST + Live-WebSocket" --> UI["Web-App / PWA"]
+```
+
+| Paket | Inhalt |
+| --- | --- |
+| [`packages/shared`](packages/shared) | Typen, Effekt-Renderer, Stufen- und Alert-Auswahl (läuft im Server **und** im Browser) |
+| [`server`](server) | Fastify, StreamElements-Client, Engine, Konnektoren, JSON-Datenhaltung |
+| [`web`](web) | React + Vite, Material 3 in Schwarz-Violett |
+
+## 💡 Lichter einrichten
+
+<details>
+<summary><b>Twinkly</b> (z. B. Strings HD): lokale xled-API, Echtzeit pro LED</summary>
+
+- Kette in der Twinkly-App ins WLAN bringen und die IP im Router fest reservieren.
+- **Lichter → Licht hinzufügen → Twinkly → Suchen** oder die IP eintragen. **Prüfen** zeigt Modell, LED-Anzahl und RGB/RGBW.
+- **Hersteller-Effekte:** Gewünschte Effekte in der Twinkly-App in die **Playlist** der Kette legen. Nur dann liegen sie auf dem Controller. Danach **Effekte → Hersteller → Neu einlesen**.
+- Eigene Effekte laufen in Echtzeit (UDP 7777). Bei vertauschten Farben unter „Farbkanäle“ eine andere Reihenfolge wählen (RGBW-Ketten: `WRGB` oder `RGBW`).
+- Schnelltest ohne ueLights: `curl http://<IP>/xled/v1/gestalt` muss JSON liefern.
+- Die xled-API ist inoffiziell; Firmware-Updates können sie ändern.
+</details>
+
+<details>
+<summary><b>Govee</b>: LAN-API, App-Szenen lokal per ptReal</summary>
+
+- In der Govee-Home-App je Gerät **LAN Control** einschalten (nur Modelle von Govees LAN-Liste).
+- UDP 4001 (Multicast), 4002 (Antwort) und 4003 (Befehle) müssen im Netz durchgehen. Port **4002** darf auf dem Host nicht belegt sein.
+- Offiziell lokal steuerbar: an/aus, Helligkeit, Farbe. Eigene Effekte laufen als gedrosselte Farbfolge (Standard 5 Befehle/s).
+- **App-Szenen:** Den Szenen-Katalog des Modells einmal als JSON besorgen und unter **Effekte → Hersteller → Szenen importieren** einfügen. Ausgelöst wird lokal, so wie es die Govee-App tut.
 
 ```jsonc
-// 1) einfache Liste
-[{ "name": "Aurora", "sceneCode": 1234, "sceneParam": "<base64 optional>" }]
-// 2) Govee-Bibliotheksformat
-{ "data": { "categories": [{ "scenes": [{ "sceneName": "Wald", "lightEffects": [{ "sceneCode": 99, "scenceParam": "AQI=" }] }] }] } }
-// 3) mitgeschnittene Befehle
-[{ "name": "DIY Blitz", "commands": ["<Base64, 20 Byte>", "…"] }]
+[{ "name": "Aurora", "sceneCode": 1234, "sceneParam": "<base64 optional>" }]                    // einfache Liste
+{ "data": { "categories": [{ "scenes": [{ "sceneName": "Wald", "lightEffects": [{ "sceneCode": 99, "scenceParam": "AQI=" }] }] }] } } // Govee-Bibliothek
+[{ "name": "DIY Blitz", "commands": ["<Base64, 20 Byte>", "…"] }]                                // mitgeschnittene Befehle
 ```
 
-  Szenen ohne Parameter sind zuverlässig; Szenen mit Parameter-Block sind nach der Kodierung von govee2mqtt/govee-local-api umgesetzt und sollten pro Modell kurz getestet werden. „Snapshots“ aus der Govee-App liegen nur in Govees Cloud und sind lokal nicht erreichbar.
+Snapshots aus der Govee-App liegen nur in Govees Cloud und sind lokal nicht erreichbar.
+</details>
 
-#### amaran / Aputure
-* **amaran Desktop** (Mac/Windows) muss laufen; sie hält die Bluetooth-Verbindung zu den Leuchten und öffnet einen lokalen WebSocket (Standard-Port **33782**).
-* *Einstellungen → amaran Desktop*: Adresse `ws://<Rechner-IP>:33782/ws`, aktivieren. Lauscht die App nur auf `localhost`, ueLights auf demselben Rechner betreiben oder einen kleinen Port-Weiterleiter einrichten.
-* *Lichter → amaran → Suchen* listet die Leuchten (Node-ID).
-* Hersteller-Effekte: eingebaute Effekte, Presets und Szenen werden eingelesen. Die Befehlsnamen für Presets/Szenen (`set_preset`, `set_scene`) und die Intensitäts-Skala sind unter *Erweitert* einstellbar, falls deine App-Version andere erwartet.
-* Ein Gerät verarbeitet höchstens alle 200 ms einen Befehl – ueLights drosselt entsprechend.
-* Studio-Leuchten im Bild als **Bildlicht** markieren – dann schalten Alerts sie nie.
+<details>
+<summary><b>amaran / Aputure</b>: über die amaran-Desktop-App</summary>
 
-#### Home Assistant
-* Home Assistant → Profil → Sicherheit → **Langlebiges Zugriffstoken** erstellen.
-* *Einstellungen → Home Assistant*: Adresse (`http://<IP>:8123`) und Token eintragen, aktivieren.
-* *Lichter → Home Assistant → Suchen* listet `light.*`, `scene.*` und `script.*`. Die `effect_list` der Lichter erscheint als Hersteller-Effekte – z. B. alle Govee-App-Szenen mit der HACS-Integration *Govee Local Plus*, Twinkly-Effekte über die offizielle Integration.
-* Ein Licht entweder direkt oder über Home Assistant anlegen, nicht beides.
+- **amaran Desktop** (Mac/Windows) muss laufen. Die App hält die Bluetooth-Verbindung zu den Leuchten und öffnet einen lokalen WebSocket (Standard-Port **33782**).
+- **Einstellungen → amaran Desktop:** `ws://<Rechner-IP>:33782/ws` eintragen, aktivieren. Läuft ueLights unter Windows auf demselben PC, genügt `ws://localhost:33782/ws`.
+- **Lichter → amaran → Suchen** listet die Leuchten. Eingebaute Effekte, Presets und Szenen werden eingelesen.
+- Befehlsnamen für Presets und Szenen sowie die Intensitäts-Skala sind unter *Erweitert* einstellbar.
+- Leuchten, die im Bild ausleuchten, als **Bildlicht** markieren. Alerts schalten sie dann nie.
+</details>
 
-#### Virtuell & Webhook
-* **Virtuell:** LED-Streifen auf der Live-Seite – ideal, um Alerts ohne Hardware zu bauen.
-* **Webhook:** `POST` mit JSON (`type: alert|color|restore|off`, Event-Daten) an eine lokale Adresse, z. B. Node-RED.
+<details>
+<summary><b>Home Assistant</b>: Lichter, Effekte, Szenen und Skripte</summary>
 
-### 3. Alerts bauen
-1. *Alerts → Neuer Alert*, Trigger wählen (z. B. „Spende (Tip)“).
-2. **Ein Alert** oder **Stufen nach Betrag**. Bei Stufen z. B. `1–4,99 €`, `5–9,99 €`, `10–49,99 €`, `ab 50 €`. Ein exakter Betrag (`genau 4,20 €`) gewinnt immer gegen einen Bereich. Lücken/Überschneidungen werden angezeigt.
-3. Je Stufe **Licht hinzufügen** → Licht/Gruppe, Effekt (eigen, Hersteller oder „Farbe aus Nachricht“), Start und Dauer.
-4. **Testen** spielt die gewählte Stufe sofort ab.
+- Home Assistant → Profil → Sicherheit → **Langlebiges Zugriffstoken** erstellen.
+- **Einstellungen → Home Assistant:** Adresse (`http://<IP>:8123`) und Token eintragen, aktivieren.
+- **Lichter → Home Assistant → Suchen** listet `light.*`, `scene.*` und `script.*`. Die `effect_list` jedes Lichts erscheint als Hersteller-Effekte, z. B. alle Govee-Szenen über die HACS-Integration *Govee Local Plus*.
+- Ein Licht entweder direkt oder über Home Assistant anlegen, nicht beides.
+</details>
 
-Passen mehrere Alerts auf ein Event, gewinnt der spezifischste (exakt > Bereich > ab > jeder Betrag), bei Gleichstand der weiter oben in der Liste. Alerts mit „Immer zusätzlich ausführen“ laufen parallel mit. Alerts laufen nacheinander über eine Warteschlange.
+<details>
+<summary><b>Virtuell & Webhook</b></summary>
 
-## Konfiguration (Umgebungsvariablen)
+- **Virtuell:** LED-Streifen auf der Live-Seite, ideal zum Bauen und Testen ohne Hardware.
+- **Webhook:** `POST` mit JSON (`type: alert | color | restore | off`, Event-Daten) an eine lokale Adresse, z. B. Node-RED.
+</details>
+
+## 🪜 Beispiel: Spenden-Stufen in 2 Minuten
+
+1. **Alerts → Neuer Alert**, Trigger **Spende (Tip)**, **Stufen nach Betrag**.
+2. Stufen anlegen: `1–4,99 €` · `5–9,99 €` · `10–49,99 €` · `ab 50 €`. Optional ein Easter Egg mit `genau 13,37 €`.
+3. Je Stufe **Licht hinzufügen** und einen Effekt wählen: eigener Effekt, Hersteller-Effekt oder „Farbe aus Nachricht“.
+4. **Testen** spielt die gewählte Stufe sofort ab, **Speichern**. Ab jetzt löst jede eingehende Spende automatisch die passende Stufe aus.
+
+Passen mehrere Alerts auf ein Event, gewinnt der spezifischste (exakt › Bereich › ab › jeder Betrag), bei Gleichstand der weiter oben in der Liste. Alerts mit „Immer zusätzlich ausführen“ laufen mit.
+
+## 🐳 Betrieb
+
+<details>
+<summary><b>Docker / Synology DSM</b></summary>
+
+```yaml
+services:
+  uelights:
+    build: .
+    restart: unless-stopped
+    network_mode: host        # für die Gerätesuche (Broadcast/Multicast) und Govee-Port 4002
+    environment:
+      - TZ=Europe/Berlin
+    volumes:
+      - ./data:/data
+```
+
+Synology: *Container Manager → Projekt → Erstellen*, den Repo-Ordner wählen. Von unterwegs z. B. per Tailscale erreichbar.
+</details>
+
+<details>
+<summary><b>Windows</b></summary>
+
+| Skript | Zweck |
+| --- | --- |
+| `ueLights-starten.bat` | Start im Fenster (`-Port 8788`, `-Rebuild`, `-NoBrowser`) |
+| `windows\autostart-einrichten.ps1` | Unsichtbarer Start bei der Anmeldung mit Neustart nach Absturz; `-Firewall` (als Admin) legt Regeln für TCP 8787 und UDP 4002 an |
+| `windows\autostart-entfernen.ps1` | Autostart entfernen, Hintergrund-Server beenden |
+| `windows\update.ps1` | `git pull`, neu bauen, Autostart neu starten |
+
+Daten liegen in `%LOCALAPPDATA%\ueLights`, Logs unter `…\ueLights\logs\uelights.log`.
+</details>
+
+<details>
+<summary><b>Umgebungsvariablen</b></summary>
 
 | Variable | Standard | Bedeutung |
 | --- | --- | --- |
@@ -163,59 +267,67 @@ Passen mehrere Alerts auf ein Event, gewinnt der spezifischste (exakt > Bereich 
 | `UELIGHTS_PASSWORD` | – | Passwort fest vorgeben |
 | `SE_JWT` | – | StreamElements-Token |
 | `HA_TOKEN` | – | Home-Assistant-Token |
-| `UELIGHTS_DISABLE_AUTH` | `0` | Login abschalten (nur Tests) |
-| `LOG_LEVEL` | `info` | `debug` zeigt mehr |
+| `UELIGHTS_DISABLE_AUTH` | `0` | Login abschalten (nur für Tests) |
+| `LOG_LEVEL` | `info` | `debug` für mehr Ausgabe |
+</details>
 
-## API (Auszug)
+<details>
+<summary><b>REST- & Live-API</b></summary>
 
-Alle Endpunkte unter `/api`, Anmeldung per Session-Cookie.
+Alle Endpunkte liegen unter `/api`, Anmeldung per Session-Cookie.
 
 | Methode | Pfad | Zweck |
 | --- | --- | --- |
-| `GET` | `/api/bootstrap` | Alles für die Web-App |
-| `POST/PUT/DELETE` | `/api/alerts`, `/api/effects`, `/api/lights`, `/api/groups` | Verwalten; `PUT /api/alerts` mit Liste = Reihenfolge |
-| `POST` | `/api/alerts/:id/fire` | Alert/Stufe testen (`{ tierId, amount }`) |
+| `GET` | `/api/bootstrap` | Alle Daten für die Web-App |
+| `POST/PUT/DELETE` | `/api/alerts` · `/api/effects` · `/api/lights` · `/api/groups` | Verwalten; `PUT /api/alerts` mit einer Liste setzt die Reihenfolge |
+| `POST` | `/api/alerts/:id/fire` | Alert oder Stufe testen (`{ tierId, amount }`) |
 | `POST` | `/api/test-event` | Testevent (`{ type, amount, message, reward }`) |
-| `POST` | `/api/stop` · `/api/pause` | Alles stoppen · Pause |
 | `POST` | `/api/trigger-mode` | `{ mode: "auto" \| "manual" }` |
-| `POST` | `/api/events/:id/release` · `/dismiss` · `/api/pending/release-all` | Manuellen Alert freigeben / verwerfen |
-| `POST` | `/api/lights/:id/natives/refresh` · `/import` | Hersteller-Effekte einlesen/importieren |
+| `POST` | `/api/events/:id/release` · `/dismiss` · `/api/pending/release-all` | Manuelle Alerts freigeben oder verwerfen |
+| `POST` | `/api/stop` · `/api/pause` | Alles stoppen · Pause |
+| `POST` | `/api/lights/:id/natives/refresh` · `/import` | Hersteller-Effekte einlesen oder importieren |
 | `GET` | `/api/discover/{twinkly,govee,homeassistant,amaran}` | Geräte finden |
 | `GET/POST` | `/api/export` · `/api/import` | Sicherung |
 | `WS` | `/api/live` | Live-Events, Status, virtuelle LEDs |
+</details>
 
-Ein Stream-Deck/Companion kann Alerts per `POST /api/alerts/:id/fire` auslösen (mit Cookie oder bei `UELIGHTS_DISABLE_AUTH=1` im abgeschotteten Netz).
+## 🔒 Datenschutz & Sicherheit
 
-## Bekannte Grenzen / beim ersten Live-Test prüfen
+- Das StreamElements-Token liegt nur in `data/store.json` auf deinem Rechner (Dateirechte 600) und wird nie an den Browser zurückgegeben.
+- Die Lichter werden ausschließlich im lokalen Netz angesprochen. Einzige Ausnahme: Der Govee-Szenen-Katalog wird einmalig von dir importiert.
+- Login mit Passwort (scrypt), Session-Cookie mit `httpOnly` und `SameSite=strict`.
+- Der Flacker-Schutz begrenzt Strobe-, Puls- und Farbwechsel-Effekte standardmäßig auf 3 Blitze pro Sekunde, angelehnt an gängige Empfehlungen zur Photosensibilität.
 
-* **StreamElements-Felder:** Die Payloads sind je Plattform leicht unterschiedlich; ueLights liest sie defensiv. Das Rohformat jedes Events steht im Protokoll (`data/events.json`), falls ein Feld fehlt.
-* **Twinkly Strings HD** ist in der xled-Doku nicht getestet – Hardware-Test (Prüfen, Effekt testen, Farbkanäle) zuerst.
-* **amaran:** Preset-/Szenen-Befehlsnamen und Intensitäts-Skala sind konfigurierbar, weil die OpenAPI-Doku nicht öffentlich lesbar ist.
-* **Govee-Szenen mit Parametern** sind inoffiziell; Snapshots aus der Cloud gehen lokal nicht.
-* Sitzungen liegen im Speicher – nach einem Neustart einmal neu anmelden.
-
-## Roadmap (noch nicht umgesetzt)
-
-* **Stream Deck / Companion ohne Login:** API-Schlüssel statt Session-Cookie für `POST /api/alerts/:id/fire`
-* **Weitere Trigger-Quellen:** OBS-Szenenwechsel (obs-websocket), eingehende Webhooks (z. B. FF-Overlay, betterplace)
-* **MQTT-Konnektor**
-* **Twinkly-Layout:** räumliche Effekte (Welle am Baum) aus dem in der App gemappten Layout
-* **Ziele / Hype-Train** als dauerhafte Füllstandsanzeige (`channel.session.update`)
-* **Zeitleiste per Drag & Drop**, Alerts per Drag & Drop sortieren
-* **Undo / Versionen** für Alerts und Effekte, Statistik (welcher Alert wie oft, Fehlerquote je Gerät)
-* **Warteschlange je Gerät** statt einer globalen (Alerts auf verschiedenen Lichtern parallel)
-* Spenden-Moderation (`channel.tips.moderation`), Sessions über Neustarts hinweg
-* Windows-`.exe` (Node Single Executable) per GitHub Actions
-
-## Entwicklung
+## 🧪 Entwicklung
 
 ```bash
 npm install
-npm test          # Vitest: Stufen, Effekte, Flacker-Schutz, Normalisierung, Gift-Bündelung, Govee-Kodierung
+npm run dev         # Server :8787 mit Auto-Reload + Vite :5173 mit Proxy
+npm test            # Vitest: Stufen, Effekte, Flacker-Schutz, Normalisierung, Gift-Bündelung, Govee-Kodierung, Automatisch/Manuell
 npm run typecheck
-npm run dev
+npm run build
 ```
 
-## Lizenz
+## ⚠️ Bekannte Grenzen
 
-MIT
+- **StreamElements-Felder** unterscheiden sich je Plattform leicht. ueLights liest sie defensiv aus; das Rohformat jedes Events steht in `data/events.json`.
+- **Twinkly Strings HD** ist in der xled-Doku nicht getestet. Vor dem ersten Einsatz „Prüfen“ und einen Effekt testen.
+- **amaran:** Befehlsnamen für Presets und Szenen sind konfigurierbar, weil die OpenAPI-Doku nicht öffentlich lesbar ist.
+- **Govee-Szenen mit Parametern** sind inoffiziell umgesetzt.
+- Sitzungen liegen im Speicher; nach einem Neustart des Servers einmal neu anmelden.
+
+## 🗺️ Roadmap
+
+- [ ] API-Schlüssel für Stream Deck / Companion (`POST /api/alerts/:id/fire` ohne Login)
+- [ ] Weitere Trigger-Quellen: OBS-Szenenwechsel (obs-websocket), eingehende Webhooks (FF-Overlay, betterplace)
+- [ ] MQTT-Konnektor
+- [ ] Räumliche Twinkly-Effekte aus dem gemappten Layout
+- [ ] Spendenziele und Hype-Train als dauerhafte Füllstandsanzeige
+- [ ] Zeitleiste und Alert-Reihenfolge per Drag & Drop
+- [ ] Undo/Versionen, Statistik je Alert und Gerät
+- [ ] Warteschlange je Gerät (parallele Alerts auf verschiedenen Lichtern)
+- [ ] Windows-`.exe` per GitHub Actions
+
+## 📄 Lizenz
+
+[MIT](LICENSE) © Tobias Lindner

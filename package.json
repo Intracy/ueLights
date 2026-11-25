@@ -14,7 +14,8 @@
     "build": "npm run build --workspace web && npm run build --workspace server",
     "start": "node server/dist/index.js",
     "test": "vitest run",
-    "typecheck": "tsc -p packages/shared && tsc -p server --noEmit && tsc -p web --noEmit"
+    "typecheck": "tsc -p packages/shared && tsc -p server --noEmit && tsc -p web --noEmit",
+    "demo": "node scripts/demo-data.mjs ./demo-data && DATA_DIR=./demo-data UELIGHTS_DISABLE_AUTH=1 node server/dist/index.js"
   },
   "devDependencies": {
     "typescript": "^5.6.3",
