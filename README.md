@@ -58,7 +58,27 @@ Dann `http://<NAS-IP>:8787` öffnen, Passwort festlegen, fertig. Von unterwegs z
 
 Synology DSM: *Container Manager → Projekt → Erstellen*, Ordner mit dem Repo wählen, `docker-compose.yml` übernehmen.
 
-### Ohne Docker
+### Windows (ohne Docker)
+
+Gut geeignet, wenn amaran Desktop auf demselben PC läuft – dann reicht `ws://localhost:33782/ws`.
+
+1. Repo als ZIP laden (GitHub → *Code → Download ZIP*) und entpacken – oder `git clone`.
+2. **`ueLights-starten.bat`** doppelklicken.
+   * Fehlt Node.js 20+, bietet das Skript die Installation per `winget` an.
+   * Beim ersten Start werden Abhängigkeiten installiert und die App gebaut (einige Minuten), danach startet sie in Sekunden. Nach Code-Änderungen baut das Skript automatisch neu.
+   * Der Browser öffnet `http://localhost:8787`. Beenden mit Strg+C.
+3. Windows fragt beim ersten Start nach der Firewall: **Private Netzwerke zulassen** (für Zugriff vom Handy und für Govee).
+
+| Skript | Zweck |
+| --- | --- |
+| `ueLights-starten.bat` | Starten im Fenster (Optionen: `-Port 8788`, `-Rebuild`, `-NoBrowser`) |
+| `windows\autostart-einrichten.ps1` | Start bei jeder Windows-Anmeldung, unsichtbar, mit Neustart bei Absturz. `-Firewall` (als Admin) legt Regeln für TCP 8787 und UDP 4002 an |
+| `windows\autostart-entfernen.ps1` | Autostart entfernen und Hintergrund-Server beenden |
+| `windows\update.ps1` | `git pull`, neu bauen, Autostart neu starten |
+
+PowerShell-Skripte per Rechtsklick → *Mit PowerShell ausführen*. Daten liegen in `%LOCALAPPDATA%\ueLights`, Logs des Hintergrundbetriebs in `%LOCALAPPDATA%\ueLights\logs\uelights.log`.
+
+### Ohne Docker (Linux/macOS)
 
 ```bash
 npm install
@@ -170,6 +190,19 @@ Ein Stream-Deck/Companion kann Alerts per `POST /api/alerts/:id/fire` auslösen 
 * **amaran:** Preset-/Szenen-Befehlsnamen und Intensitäts-Skala sind konfigurierbar, weil die OpenAPI-Doku nicht öffentlich lesbar ist.
 * **Govee-Szenen mit Parametern** sind inoffiziell; Snapshots aus der Cloud gehen lokal nicht.
 * Sitzungen liegen im Speicher – nach einem Neustart einmal neu anmelden.
+
+## Roadmap (noch nicht umgesetzt)
+
+* **Stream Deck / Companion ohne Login:** API-Schlüssel statt Session-Cookie für `POST /api/alerts/:id/fire`
+* **Weitere Trigger-Quellen:** OBS-Szenenwechsel (obs-websocket), eingehende Webhooks (z. B. FF-Overlay, betterplace)
+* **MQTT-Konnektor**
+* **Twinkly-Layout:** räumliche Effekte (Welle am Baum) aus dem in der App gemappten Layout
+* **Ziele / Hype-Train** als dauerhafte Füllstandsanzeige (`channel.session.update`)
+* **Zeitleiste per Drag & Drop**, Alerts per Drag & Drop sortieren
+* **Undo / Versionen** für Alerts und Effekte, Statistik (welcher Alert wie oft, Fehlerquote je Gerät)
+* **Warteschlange je Gerät** statt einer globalen (Alerts auf verschiedenen Lichtern parallel)
+* Spenden-Moderation (`channel.tips.moderation`), Sessions über Neustarts hinweg
+* Windows-`.exe` (Node Single Executable) per GitHub Actions
 
 ## Entwicklung
 
