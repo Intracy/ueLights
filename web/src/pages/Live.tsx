@@ -46,6 +46,7 @@ function statusText(e: EventLogEntry): { text: string; cls: string } {
   const o = e.outcome;
   if (o.status === 'skipped') return { text: o.reason, cls: 'muted' };
   const names = e.alertNames.join(' + ') + (o.tierLabel ? ` · ${o.tierLabel}` : '');
+  if (o.status === 'pending') return { text: `${names} · wartet auf Freigabe`, cls: '' };
   if (o.status === 'queued') return { text: `${names} · wartet`, cls: '' };
   if (o.status === 'playing') return { text: `${names} · läuft`, cls: '' };
   return { text: `${names} · fertig`, cls: 'muted' };
@@ -68,6 +69,7 @@ export function LivePage() {
   const np = live.nowPlaying;
   const progress = np ? Math.min(100, ((now - np.startedAt) / Math.max(1, np.durationMs)) * 100) : 0;
   const virtual = lights.filter((l) => l.connector === 'virtual' && l.enabled);
+  const pending = log.filter((e) => e.outcome.status === 'pending').slice().reverse();
   const fire = (ev: Partial<NormalizedEvent> & { type: EventType }) => run(() => api.post('/api/test-event', ev));
 
   return (
@@ -101,8 +103,67 @@ export function LivePage() {
           <section className="card" aria-label="Status">
             <div className="row">
               <Icon name={live.paused ? 'pause_circle' : 'sensors'} style={{ color: live.paused ? 'var(--error)' : 'var(--secondary)' }} />
-              <span className="grow">{live.paused ? 'Alerts sind pausiert – Events werden nur protokolliert.' : 'Bereit. Warte auf Events von StreamElements.'}</span>
+              <span className="grow">
+                {live.paused
+                  ? 'Alerts sind pausiert – Events werden nur protokolliert.'
+                  : live.triggerMode === 'auto'
+                    ? 'Automatisch: Eingehende StreamElements-Alerts lösen die Lichter sofort aus.'
+                    : 'Manuell: Passende Alerts warten unten auf deine Freigabe.'}
+              </span>
               <span className="mono small muted">Warteschlange {live.queueLength}</span>
+            </div>
+          </section>
+        )}
+
+        {live.triggerMode === 'manual' && (
+          <section className={`card ${pending.length ? 'pending-card' : ''}`} aria-label="Warten auf Freigabe">
+            <div className="row">
+              <Icon name="touch_app" style={{ color: 'var(--primary)' }} />
+              <h2 className="grow">Warten auf Freigabe{pending.length ? ` (${pending.length})` : ''}</h2>
+              {pending.length > 1 && (
+                <>
+                  <button className="btn text" onClick={() => run(() => api.post('/api/pending/dismiss-all'), 'Alle verworfen')}>
+                    Alle verwerfen
+                  </button>
+                  <button className="btn" onClick={() => run(() => api.post('/api/pending/release-all'), 'Alle freigegeben')}>
+                    <Icon name="play_arrow" />
+                    Alle freigeben
+                  </button>
+                </>
+              )}
+            </div>
+            {pending.length === 0 && (
+              <span className="small muted">
+                Manueller Modus: Passende Alerts erscheinen hier und laufen erst nach Freigabe. Zurück zu „Automatisch“ oben rechts.
+              </span>
+            )}
+            <div className="list" style={{ gap: 8 }}>
+              {pending.map((e) => (
+                <div key={e.event.id} className="row" style={{ flexWrap: 'nowrap' }}>
+                  <span className="avatar">
+                    <Icon name={EVENT_ICONS[e.event.type]} />
+                  </span>
+                  <div className="grow" style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span>
+                      {summary(e.event)}
+                      {e.event.user ? ` · ${e.event.user}` : ''}
+                    </span>
+                    <span className="small muted">
+                      {e.alertNames.join(' + ')}
+                      {e.outcome.status === 'pending' && e.outcome.tierLabel ? ` · ${e.outcome.tierLabel}` : ''}
+                      {e.event.message ? ` · „${e.event.message}“` : ''}
+                    </span>
+                  </div>
+                  <span className="mono small muted">{formatAgo(e.receivedAt)}</span>
+                  <button className="btn text" onClick={() => run(() => api.post(`/api/events/${encodeURIComponent(e.event.id)}/dismiss`))}>
+                    Verwerfen
+                  </button>
+                  <button className="btn" onClick={() => run(() => api.post(`/api/events/${encodeURIComponent(e.event.id)}/release`))}>
+                    <Icon name="play_arrow" />
+                    Freigeben
+                  </button>
+                </div>
+              ))}
             </div>
           </section>
         )}
@@ -164,7 +225,7 @@ export function LivePage() {
           <section className="card">
             <h2>Testevent senden</h2>
             <p className="small muted" style={{ margin: 0 }}>
-              Testevents laufen durch dieselbe Logik wie echte Events. Alerts reagieren nur, wenn „Testevents zulassen“ aktiv ist.
+              Testevents laufen durch dieselbe Logik wie echte Events (auch Automatisch/Manuell). Alerts reagieren nur, wenn „Testevents zulassen“ aktiv ist.
             </p>
             <div className="row" style={{ gap: 8 }}>
               {QUICK.map((q) => (

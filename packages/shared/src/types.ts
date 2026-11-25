@@ -250,6 +250,8 @@ export interface Alert {
   after: 'restore' | 'hold';
   cooldownMs: number;
   overlap: 'exclusive' | 'additive';
+  /** Auslösung: wie global eingestellt, immer automatisch oder immer nach manueller Freigabe */
+  triggerMode?: 'inherit' | 'auto' | 'manual';
 }
 
 // ----------------------------- Einstellungen -------------------------------
@@ -288,6 +290,8 @@ export interface Settings {
     foreignCurrency: 'convert' | 'original' | 'ignore';
   };
   /** Maximale Befehle pro Sekunde für Lichter ohne Echtzeit-Modus */
+  /** auto = eingehende Events lösen Alerts sofort aus; manual = Alerts warten auf Freigabe im Live-Feed */
+  triggerMode: 'auto' | 'manual';
   colorCommandRate: number;
   /** Bildwiederholrate für Echtzeit-Lichter */
   realtimeFps: number;
@@ -323,6 +327,7 @@ export const DEFAULT_SETTINGS: Settings = {
     fxRates: { USD: 0.92, GBP: 1.17, CHF: 1.06 },
     foreignCurrency: 'convert',
   },
+  triggerMode: 'auto',
   colorCommandRate: 5,
   realtimeFps: 25,
 };
@@ -330,6 +335,7 @@ export const DEFAULT_SETTINGS: Settings = {
 // ----------------------------- Laufzeit / Live -----------------------------
 
 export type EventOutcome =
+  | { status: 'pending'; alertIds: string[]; tierLabel?: string }
   | { status: 'queued'; alertIds: string[]; tierLabel?: string }
   | { status: 'playing'; alertIds: string[]; tierLabel?: string }
   | { status: 'done'; alertIds: string[]; tierLabel?: string }
@@ -362,6 +368,8 @@ export interface LiveState {
   connections: ConnectionStatus[];
   nowPlaying: NowPlaying | null;
   queueLength: number;
+  pendingCount: number;
+  triggerMode: 'auto' | 'manual';
   paused: boolean;
 }
 

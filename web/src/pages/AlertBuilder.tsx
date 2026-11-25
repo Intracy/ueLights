@@ -33,6 +33,7 @@ function blankAlert(): Alert {
     after: 'restore',
     cooldownMs: 0,
     overlap: 'exclusive',
+    triggerMode: 'inherit',
   };
 }
 
@@ -355,6 +356,13 @@ export function AlertBuilder({ id }: { id: string }) {
                   </select>
                 </Field>
               </div>
+              <Field label="Auslösung" hint={`Global eingestellt: ${settings.triggerMode === 'auto' ? 'automatisch' : 'manuell'} (umschaltbar oben rechts).`}>
+                <select value={draft.triggerMode ?? 'inherit'} onChange={(e) => update({ triggerMode: e.target.value as Alert['triggerMode'] })}>
+                  <option value="inherit">Wie global eingestellt</option>
+                  <option value="auto">Immer automatisch</option>
+                  <option value="manual">Immer nach manueller Freigabe</option>
+                </select>
+              </Field>
               <Switch checked={draft.enabled} onChange={(v) => update({ enabled: v })} label="Alert aktiv" />
             </section>
           </div>

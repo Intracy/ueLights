@@ -231,3 +231,9 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .led-strip { display: flex; gap: 2px; height: 18px; align-items: center; padding: 6px 8px; background: #000; border-radius: 8px; border: 1px solid var(--outline-variant); overflow: hidden; }
 .led-strip > span { flex: 1 1 0; height: 6px; border-radius: 3px; min-width: 2px; }
 .swatch { width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--outline-variant); flex: 0 0 28px; }
+
+.mode-switch { height: 32px; border-radius: 8px; }
+.mode-switch button { padding: 0 10px; font-size: 13px; }
+.badge { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--error); color: #2a0010; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-mono); }
+.pending-card { border-color: var(--primary); box-shadow: var(--glow); }
+.topbar .segmented { align-self: center; }

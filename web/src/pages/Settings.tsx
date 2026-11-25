@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import type { Settings } from '@uelights/shared';
 import { api } from '../api';
 import { useData } from '../data';
-import { Field, Icon, NumberInput, Switch, TopBar } from '../ui';
+import { Field, Icon, NumberInput, Segmented, Switch, TopBar } from '../ui';
 
 export function SettingsPage() {
   const { settings, saveSettings, run, reload, live } = useData();
   const [s, setS] = useState<Settings>(() => strip(settings));
   const [dirty, setDirty] = useState(false);
+  const [modeTouched, setModeTouched] = useState(false);
   const [pw, setPw] = useState({ current: '', next: '' });
   const [fxText, setFxText] = useState(() => fxToText(settings.events.fxRates));
 
@@ -31,12 +32,21 @@ export function SettingsPage() {
       const m = line.match(/^\s*([A-Za-z]{3})\s*[=:]\s*([0-9.,]+)\s*$/);
       if (m) fxRates[m[1].toUpperCase()] = Number(m[2].replace(',', '.'));
     }
-    const next = { ...s, events: { ...s.events, fxRates } };
+    const next: Settings = {
+      ...s,
+      // Pause und Auslösung können sich inzwischen über die Kopfleiste geändert haben
+      triggerMode: modeTouched ? s.triggerMode : live.triggerMode,
+      safety: { ...s.safety, paused: live.paused },
+      events: { ...s.events, fxRates },
+    };
     const ok = await run(async () => {
       await saveSettings(next);
       return true;
     }, 'Einstellungen gespeichert');
-    if (ok) setDirty(false);
+    if (ok) {
+      setDirty(false);
+      setModeTouched(false);
+    }
   };
 
   return (
@@ -72,6 +82,27 @@ export function SettingsPage() {
             <Switch checked={s.streamelements.topics.activities} onChange={(v) => up('streamelements', { topics: { ...s.streamelements.topics, activities: v } })} label="Aktivitäten (Spenden, Bits, Subs, Raids, Kanalpunkte …)" />
             <Switch checked={s.streamelements.topics.chat} onChange={(v) => up('streamelements', { topics: { ...s.streamelements.topics, chat: v } })} label="Chat-Nachrichten (für Chat-Befehle)" />
             <Switch checked={s.streamelements.topics.tips} onChange={(v) => up('streamelements', { topics: { ...s.streamelements.topics, tips: v } })} label="Zusätzlich channel.tips (Duplikate werden gefiltert)" />
+          </section>
+
+          <section className="card">
+            <h2>Auslösung</h2>
+            <Segmented
+              label="Auslösung"
+              value={modeTouched ? s.triggerMode : live.triggerMode}
+              onChange={(v) => {
+                setS((x) => ({ ...x, triggerMode: v }));
+                setModeTouched(true);
+                setDirty(true);
+              }}
+              options={[
+                { value: 'auto', label: 'Automatisch' },
+                { value: 'manual', label: 'Manuell' },
+              ]}
+            />
+            <p className="small muted" style={{ margin: 0 }}>
+              <strong>Automatisch</strong> (Standard): Eingehende StreamElements-Alerts lösen die passenden Licht-Alerts sofort aus.{' '}
+              <strong>Manuell</strong>: Passende Alerts warten im Live-Feed, bis du sie freigibst oder verwirfst. Einzelne Alerts können das im Alert-Builder übersteuern.
+            </p>
           </section>
 
           <section className="card">

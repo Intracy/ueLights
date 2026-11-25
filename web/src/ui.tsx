@@ -156,6 +156,17 @@ export function TopBar({ title, children, back }: { title: string; children?: Re
           <ConnectionChip key={c.id} c={c} />
         ))}
       </div>
+      <div className="segmented mode-switch" role="group" aria-label="Auslösung" title="Automatisch: eingehende StreamElements-Alerts lösen sofort aus. Manuell: Alerts warten im Live-Feed auf Freigabe.">
+        <button type="button" className={live.triggerMode === 'auto' ? 'on' : ''} aria-pressed={live.triggerMode === 'auto'} onClick={() => run(() => api.post('/api/trigger-mode', { mode: 'auto' }))}>
+          <Icon name="bolt" style={{ fontSize: 18 }} />
+          <span className="hide-compact">Automatisch</span>
+        </button>
+        <button type="button" className={live.triggerMode === 'manual' ? 'on' : ''} aria-pressed={live.triggerMode === 'manual'} onClick={() => run(() => api.post('/api/trigger-mode', { mode: 'manual' }))}>
+          <Icon name="touch_app" style={{ fontSize: 18 }} />
+          <span className="hide-compact">Manuell</span>
+          {live.pendingCount > 0 && <span className="badge">{live.pendingCount}</span>}
+        </button>
+      </div>
       <button
         className={`chip ${live.paused ? 'selected' : ''}`}
         onClick={() => run(() => api.post('/api/pause', { paused: !live.paused }))}

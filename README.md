@@ -11,6 +11,7 @@ ueLights empfängt Spenden, Bits, Subs, Raids, Kanalpunkte und Chat-Befehle von 
 
 | Bereich | Was geht |
 | --- | --- |
+| **Auslösung** | **Automatisch** (Standard): eingehende StreamElements-Alerts lösen die Lichter sofort aus. **Manuell**: passende Alerts warten im Live-Feed auf *Freigeben* / *Verwerfen*. Umschalter oben rechts; jeder Alert kann die globale Einstellung übersteuern |
 | **Trigger** | Alle StreamElements-Aktivitäten: Spende (Tip), Bits, Sub/Resub, Gift-Subs (Gift-Bomben gebündelt), Raid, Follow, Kanalpunkte, Chat-Nachrichten/-Befehle, Superchat, Merch, Hype-Train |
 | **Bedingungen** | Betrag *genau / von–bis / ab*, Stufen nach Betrag (5 € → Alert A, 10 € → Alert B …), Text in der Nachricht, Kanalpunkte-Belohnung, Plattform, Sub-Stufe, Testevents ja/nein |
 | **Alert-Builder** | Beliebig viele Alerts; je Alert/Stufe beliebig viele **Licht-Spuren** (Licht oder Gruppe + Effekt + Startversatz + Dauer) mit Zeitleiste |
@@ -176,6 +177,8 @@ Alle Endpunkte unter `/api`, Anmeldung per Session-Cookie.
 | `POST` | `/api/alerts/:id/fire` | Alert/Stufe testen (`{ tierId, amount }`) |
 | `POST` | `/api/test-event` | Testevent (`{ type, amount, message, reward }`) |
 | `POST` | `/api/stop` · `/api/pause` | Alles stoppen · Pause |
+| `POST` | `/api/trigger-mode` | `{ mode: "auto" \| "manual" }` |
+| `POST` | `/api/events/:id/release` · `/dismiss` · `/api/pending/release-all` | Manuellen Alert freigeben / verwerfen |
 | `POST` | `/api/lights/:id/natives/refresh` · `/import` | Hersteller-Effekte einlesen/importieren |
 | `GET` | `/api/discover/{twinkly,govee,homeassistant,amaran}` | Geräte finden |
 | `GET/POST` | `/api/export` · `/api/import` | Sicherung |

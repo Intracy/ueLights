@@ -85,7 +85,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
       };
       ws.onmessage = (m) => {
         const msg = JSON.parse(m.data) as LiveMessage;
-        if (msg.type === 'state') setData((d) => (d ? { ...d, live: msg.state } : d));
+        if (msg.type === 'state')
+          setData((d) =>
+            d
+              ? {
+                  ...d,
+                  live: msg.state,
+                  settings: { ...d.settings, triggerMode: msg.state.triggerMode, safety: { ...d.settings.safety, paused: msg.state.paused } },
+                }
+              : d,
+          );
         else if (msg.type === 'event') setData((d) => (d ? { ...d, log: [msg.entry, ...d.log].slice(0, 200) } : d));
         else if (msg.type === 'eventUpdate')
           setData((d) =>

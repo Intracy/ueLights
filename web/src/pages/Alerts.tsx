@@ -118,6 +118,18 @@ export function AlertsPage() {
                   </a>
                   <span className="small muted">{alertSummary(a)}</span>
                   <span className="row" style={{ gap: 6 }}>
+                    {a.triggerMode === 'manual' && (
+                      <span className="tag" style={{ color: 'var(--primary)' }}>
+                        <Icon name="touch_app" style={{ fontSize: 14 }} />
+                        manuell
+                      </span>
+                    )}
+                    {a.triggerMode === 'auto' && (
+                      <span className="tag" style={{ color: 'var(--secondary)' }}>
+                        <Icon name="bolt" style={{ fontSize: 14 }} />
+                        immer automatisch
+                      </span>
+                    )}
                     {targets.length === 0 && <span className="tag" style={{ color: 'var(--error)' }}>keine Lichter</span>}
                     {targets.map((t) => (
                       <span key={t} className="tag">

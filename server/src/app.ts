@@ -116,6 +116,8 @@ export async function buildApp() {
       connections: conns,
       nowPlaying: engine.nowPlaying,
       queueLength: engine.queueLength,
+      pendingCount: engine.pendingCount,
+      triggerMode: S().triggerMode,
       paused: S().safety.paused,
     };
   }
@@ -212,6 +214,9 @@ export async function buildApp() {
     if (!next.streamelements.jwt || next.streamelements.jwt.startsWith(MASK)) next.streamelements.jwt = cur.streamelements.jwt;
     if (!next.homeassistant.token || next.homeassistant.token.startsWith(MASK)) next.homeassistant.token = cur.homeassistant.token;
     delete (next as unknown as Record<string, unknown>).meta;
+    // Pause wird nur über /api/pause geschaltet
+    next.safety = { ...next.safety, paused: cur.safety.paused };
+    if (next.triggerMode !== 'auto' && next.triggerMode !== 'manual') next.triggerMode = cur.triggerMode;
     const reconnect =
       JSON.stringify([cur.streamelements, cur.homeassistant, cur.amaran]) !==
       JSON.stringify([next.streamelements, next.homeassistant, next.amaran]);
@@ -228,6 +233,26 @@ export async function buildApp() {
     pushState();
     return { paused: S().safety.paused };
   });
+
+  app.post<{ Body: { mode: 'auto' | 'manual' } }>('/api/trigger-mode', async (req, reply) => {
+    if (req.body.mode !== 'auto' && req.body.mode !== 'manual') return fail(reply, 400, 'Modus muss auto oder manual sein');
+    S().triggerMode = req.body.mode;
+    store.commit();
+    pushState();
+    toast('info', req.body.mode === 'auto' ? 'Automatisch: Alerts lösen sofort aus' : 'Manuell: Alerts warten auf Freigabe');
+    return { mode: S().triggerMode };
+  });
+
+  app.post<{ Params: { id: string } }>('/api/events/:id/release', async (req, reply) => {
+    if (!engine.release(req.params.id)) return fail(reply, 404, 'Event wartet nicht (mehr) auf Freigabe');
+    return { ok: true };
+  });
+  app.post<{ Params: { id: string } }>('/api/events/:id/dismiss', async (req, reply) => {
+    if (!engine.dismiss(req.params.id)) return fail(reply, 404, 'Event wartet nicht (mehr) auf Freigabe');
+    return { ok: true };
+  });
+  app.post('/api/pending/release-all', async () => ({ released: engine.releaseAll() }));
+  app.post('/api/pending/dismiss-all', async () => ({ dismissed: engine.dismissAll() }));
 
   app.post('/api/stop', async () => {
     engine.stopAll();
@@ -380,7 +405,7 @@ export async function buildApp() {
       ts: new Date().toISOString(),
       raw: undefined,
     };
-    engine.handle(ev);
+    engine.handle(ev, undefined, { forcePlay: true });
     return { ok: true };
   });
 
