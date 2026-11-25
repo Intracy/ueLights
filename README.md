@@ -6,7 +6,7 @@
   <a href="https://github.com/Intracy/ueLights/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Intracy/ueLights/actions/workflows/ci.yml/badge.svg"></a>
   <img alt="Node 20+" src="https://img.shields.io/badge/node-20%2B-3de0e8?logo=nodedotjs&logoColor=white">
   <img alt="Docker" src="https://img.shields.io/badge/docker-ready-b794ff?logo=docker&logoColor=white">
-  <img alt="Windows" src="https://img.shields.io/badge/windows-1--Klick--Start-b794ff?logo=windows&logoColor=white">
+  <a href="https://github.com/Intracy/ueLights/releases/latest"><img alt="Windows-EXE" src="https://img.shields.io/badge/windows-ueLights.exe-b794ff?logo=windows&logoColor=white"></a>
   <img alt="100 % lokal" src="https://img.shields.io/badge/lichter-100%25%20lokal-7cf29c">
   <a href="LICENSE"><img alt="MIT" src="https://img.shields.io/badge/lizenz-MIT-ece8f5"></a>
 </p>
@@ -59,12 +59,12 @@ docker compose up -d --build
 </td>
 <td width="33%" valign="top">
 
-**🪟 Windows**
+**🪟 Windows: eine Datei**
 
-1. Repo als ZIP laden und entpacken
-2. **`ueLights-starten.bat`** doppelklicken
+1. **[`ueLights.exe` herunterladen](https://github.com/Intracy/ueLights/releases/latest/download/ueLights.exe)**
+2. Doppelklicken, fertig
 
-Das Skript installiert Node.js bei Bedarf über `winget`, baut die App und öffnet den Browser. Autostart über `windows\autostart-einrichten.ps1`.
+Node.js ist eingebaut, eine Installation ist nicht nötig. Der Browser öffnet sich automatisch. Alternativ: `ueLights-starten.bat` aus dem Repo.
 
 </td>
 <td width="33%" valign="top">
@@ -247,6 +247,10 @@ Synology: *Container Manager → Projekt → Erstellen*, den Repo-Ordner wählen
 <details>
 <summary><b>Windows</b></summary>
 
+**`ueLights.exe`** (aus den [Releases](https://github.com/Intracy/ueLights/releases)) enthält Server, Web-App und Node.js in einer Datei. Doppelklick startet ueLights und öffnet den Browser; läuft es schon, öffnet ein zweiter Doppelklick nur den Browser. Das Fenster zeigt den Status, Schließen beendet ueLights. Die Datei ist nicht signiert: Bei SmartScreen „Weitere Informationen → Trotzdem ausführen“ wählen. Für den Autostart eine Verknüpfung in `shell:startup` legen. Selbst bauen: `npm run build:exe` auf einem Windows-Rechner.
+
+Alternativ die Skripte im Repo (Node.js wird bei Bedarf über winget installiert):
+
 | Skript | Zweck |
 | --- | --- |
 | `ueLights-starten.bat` | Start im Fenster (`-Port 8788`, `-Rebuild`, `-NoBrowser`) |
@@ -326,7 +330,6 @@ npm run build
 - [ ] Zeitleiste und Alert-Reihenfolge per Drag & Drop
 - [ ] Undo/Versionen, Statistik je Alert und Gerät
 - [ ] Warteschlange je Gerät (parallele Alerts auf verschiedenen Lichtern)
-- [ ] Windows-`.exe` per GitHub Actions
 
 ## 📄 Lizenz
 
