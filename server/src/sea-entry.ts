@@ -99,7 +99,13 @@ async function main(): Promise<void> {
   };
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
-  await app.listen({ port: config.port, host: config.host });
+  // IPv4 und IPv6 (Windows löst "localhost" zuerst als ::1 auf); ohne IPv6 auf IPv4 zurückfallen
+  try {
+    await app.listen({ port: config.port, host: process.env.HOST ?? '::' });
+  } catch (err) {
+    if (process.env.HOST) throw err;
+    await app.listen({ port: config.port, host: '0.0.0.0' });
+  }
 
   console.log(`  Web-App:     ${url}`);
   console.log(`  Im Heimnetz: http://<IP dieses PCs>:${port}`);

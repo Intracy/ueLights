@@ -68,7 +68,8 @@ fs.copyFileSync(process.execPath, exe);
 if (isWin) {
   // Icon und Versionsinfo setzen (vor dem Einspritzen)
   try {
-    const { rcedit } = await import('rcedit');
+    const mod = await import('rcedit');
+    const rcedit = mod.rcedit ?? mod.default?.rcedit ?? mod.default;
     await rcedit(exe, {
       icon: path.join(root, 'docs', 'icon.ico'),
       'file-version': pkg.version,
