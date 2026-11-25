@@ -1,0 +1,18 @@
+services:
+  uelights:
+    build: .
+    image: uelights:latest
+    container_name: uelights
+    restart: unless-stopped
+    # Host-Netzwerk: nötig für die Gerätesuche (UDP-Broadcast/Multicast) von Twinkly und Govee
+    # und für den Govee-Antwortport 4002. Die Web-App ist dann unter http://<NAS-IP>:8787 erreichbar.
+    network_mode: host
+    environment:
+      - PORT=8787
+      - TZ=Europe/Berlin
+      # Optional – sonst im Browser einstellen:
+      # - UELIGHTS_PASSWORD=bitte-aendern
+      # - SE_JWT=eyJhbGciOi...
+      # - HA_TOKEN=eyJ0eXAiOi...
+    volumes:
+      - ./data:/data
