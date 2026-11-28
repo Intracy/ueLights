@@ -184,10 +184,10 @@ export class Player {
     const realtime = driver.capabilities.realtime && !!driver.sendFrame;
     const fps = realtime ? Math.max(5, Math.min(40, settings.realtimeFps)) : Math.max(1, Math.min(10, settings.colorCommandRate));
     const interval = 1000 / fps;
+    // Erst den Echtzeitmodus vorbereiten: dabei lernt der Treiber die echte LED-Anzahl
+    if (realtime) await driver.beginRealtime?.();
     const ledCount = realtime ? driver.ledCount() : 1;
     const ctx = { ledCount, amountRatio: ratio, maxFlashHz: settings.safety.maxFlashHz, durationMs: pt.durationMs };
-
-    if (realtime) await driver.beginRealtime?.();
     const t0 = Date.now();
     let last: Rgb | null = null;
     let lastB = -1;

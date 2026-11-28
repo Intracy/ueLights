@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import dgram from 'node:dgram';
+import os from 'node:os';
 import type { Light, NativeEffect, Rgb } from '@uelights/shared';
 import { DriverError, fetchJson, type DriverCapabilities, type LightDriver } from './types.js';
 
@@ -26,6 +27,11 @@ export class TwinklyDriver implements LightDriver {
   private tokenExpires = 0;
   private leds = 250;
   private profile: 'RGB' | 'RGBW' = 'RGB';
+  /** LEDs je Strang laut led/config (leer = unbekannt) */
+  private strings: number[] = [];
+  private infoLoaded = false;
+  private product = '';
+  private fw = '';
   private udp: dgram.Socket | null = null;
 
   constructor(readonly light: Light) {
@@ -78,18 +84,48 @@ export class TwinklyDriver implements LightDriver {
     return (r.body ?? {}) as Record<string, unknown>;
   }
 
+  /**
+   * Gerätedaten lesen: LED-Anzahl und Farbprofil aus gestalt, Aufteilung in Stränge aus led/config.
+   * Mehrstrang-Controller (z. B. 2 × 250) melden in gestalt meist die Summe; zur Sicherheit gilt das Maximum.
+   */
+  async loadInfo(force = false): Promise<void> {
+    if (this.infoLoaded && !force) return;
+    const r = await fetchJson(`${this.base}/gestalt`);
+    if (r.status >= 400) throw new DriverError(`Twinkly gestalt: HTTP ${r.status}`);
+    const g = (r.body ?? {}) as Record<string, unknown>;
+    const n = Number(g.number_of_led);
+    this.profile = g.led_profile === 'RGBW' ? 'RGBW' : 'RGB';
+    this.product = String(g.product_name ?? g.device_name ?? g.product_code ?? 'Twinkly');
+    this.fw = String(g.fw_version ?? g.fw_family ?? '');
+    try {
+      const cfg = await this.call('GET', 'led/config');
+      const list = (cfg.strings as Array<Record<string, unknown>> | undefined) ?? [];
+      this.strings = list.map((x) => Number(x.length)).filter((x) => Number.isFinite(x) && x > 0);
+    } catch {
+      this.strings = [];
+    }
+    const sum = this.strings.reduce((a, b) => a + b, 0);
+    const total = Math.max(Number.isFinite(n) ? n : 0, sum);
+    if (total > 0) this.leds = total;
+    this.infoLoaded = true;
+  }
+
+  /** Für die Anzeige, z. B. „500 LEDs · 2 Stränge (250 + 250)“ */
+  describe(): string {
+    const parts = [`${this.leds} LEDs`];
+    if (this.strings.length > 1) parts.push(`${this.strings.length} Stränge (${this.strings.join(' + ')})`);
+    parts.push(this.profile);
+    return parts.join(' · ');
+  }
+
   async probe() {
     try {
-      const r = await fetchJson(`${this.base}/gestalt`);
-      const g = r.body as Record<string, unknown>;
-      const n = Number(g.number_of_led);
-      if (n > 0) this.leds = n;
-      this.profile = g.led_profile === 'RGBW' ? 'RGBW' : 'RGB';
+      await this.loadInfo(true);
       await this.login();
       return {
         ok: true,
         ledCount: this.leds,
-        detail: `${g.product_code ?? 'Twinkly'} · ${this.leds} LEDs · ${this.profile} · FW ${g.fw_family ?? ''}`.trim(),
+        detail: `${this.product} · ${this.describe()}${this.fw ? ` · FW ${this.fw}` : ''}`,
       };
     } catch (err) {
       return { ok: false, detail: (err as Error).message };
@@ -161,6 +197,7 @@ export class TwinklyDriver implements LightDriver {
   }
 
   async beginRealtime(): Promise<void> {
+    await this.loadInfo().catch(() => undefined);
     await this.call('POST', 'led/out/brightness', { mode: 'enabled', type: 'A', value: 100 });
     await this.setMode('rt');
     if (!this.udp) {
@@ -188,7 +225,8 @@ export class TwinklyDriver implements LightDriver {
     for (let i = 0; i < this.leds; i++) this.encodeLed(leds[i % leds.length] ?? { r: 0, g: 0, b: 0 }, bytes);
     const data = Buffer.from(bytes);
     // Protokoll v3: 0x03 | Token (8 Byte) | 0x00 0x00 | Fragment-Nr. | max. 900 Byte Daten
-    const host = this.light.config.host!;
+    // UDP geht immer an Port 7777; eine eingetragene HTTP-Portangabe (IPv4) weglassen
+    const host = this.light.config.host!.replace(/^(\d+\.\d+\.\d+\.\d+):\d+$/, '$1');
     for (let frag = 0, off = 0; off < data.length; frag++, off += 900) {
       const header = Buffer.concat([Buffer.from([0x03]), this.tokenBytes!, Buffer.from([0x00, 0x00, frag])]);
       const packet = Buffer.concat([header, data.subarray(off, off + 900)]);
@@ -249,24 +287,67 @@ export class TwinklyDriver implements LightDriver {
   }
 }
 
-/** Twinkly-Geräte im Netz finden (UDP-Broadcast an Port 5555). */
-export function discoverTwinkly(timeoutMs = 2000): Promise<Array<{ ip: string; name: string }>> {
-  return new Promise((resolve) => {
+/** Broadcast-Adressen aller IPv4-Netze dieses Rechners (plus 255.255.255.255). */
+function broadcastAddresses(): string[] {
+  const out = new Set<string>(['255.255.255.255']);
+  for (const list of Object.values(os.networkInterfaces())) {
+    for (const a of list ?? []) {
+      if (a.family !== 'IPv4' || a.internal || !a.netmask) continue;
+      const ip = a.address.split('.').map(Number);
+      const mask = a.netmask.split('.').map(Number);
+      // Docker-/Container-Brücken überspringen
+      if (ip[0] === 172 && ip[1] >= 16 && ip[1] <= 31) continue;
+      out.add(ip.map((b, i) => (b | (~mask[i] & 255)) & 255).join('.'));
+    }
+  }
+  return [...out];
+}
+
+export interface TwinklyFound {
+  ip: string;
+  name: string;
+  product?: string;
+  ledCount?: number;
+  strings?: number[];
+  detail?: string;
+}
+
+/** Twinkly-Geräte im Netz finden (UDP-Broadcast an Port 5555) und Gerätedaten nachladen. */
+export async function discoverTwinkly(timeoutMs = 2000): Promise<TwinklyFound[]> {
+  const found = await new Promise<Map<string, string>>((resolve) => {
     const sock = dgram.createSocket('udp4');
-    const found = new Map<string, string>();
+    const map = new Map<string, string>();
     sock.on('message', (msg, rinfo) => {
       // Antwort: 4 Byte IP (umgekehrt) + "OK" + Gerätename + 0x00
       const name = msg.subarray(6).toString('utf8').replace(/\0.*$/, '');
-      found.set(rinfo.address, name || 'Twinkly');
+      map.set(rinfo.address, name || 'Twinkly');
     });
     sock.on('error', () => undefined);
+    const probe = Buffer.concat([Buffer.from([0x01]), Buffer.from('discover')]);
     sock.bind(() => {
       sock.setBroadcast(true);
-      sock.send(Buffer.concat([Buffer.from([0x01]), Buffer.from('discover')]), 5555, '255.255.255.255');
+      const send = () => broadcastAddresses().forEach((addr) => sock.send(probe, 5555, addr, () => undefined));
+      send();
+      setTimeout(send, 400);
     });
     setTimeout(() => {
       sock.close();
-      resolve([...found].map(([ip, name]) => ({ ip, name })));
+      resolve(map);
     }, timeoutMs);
   });
+
+  return Promise.all(
+    [...found].map(async ([ip, name]) => {
+      const d = new TwinklyDriver({
+        id: '', name, connector: 'twinkly', config: { host: ip }, role: 'deco', enabled: true,
+        restState: { mode: 'snapshot' }, nativeEffects: [],
+      } as unknown as Light);
+      try {
+        await d.loadInfo();
+        return { ip, name, ledCount: d.ledCount(), detail: d.describe() };
+      } catch {
+        return { ip, name };
+      }
+    }),
+  );
 }

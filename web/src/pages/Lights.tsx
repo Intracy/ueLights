@@ -189,8 +189,8 @@ function LightEditor({ light, onClose }: { light: Light; onClose: () => void }) 
     setFound(null);
     try {
       if (l.connector === 'twinkly') {
-        const r = await api.get<Array<{ ip: string; name: string }>>('/api/discover/twinkly');
-        setFound(r.map((d) => ({ label: d.name, detail: d.ip, apply: { host: d.ip, name: d.name } })));
+        const r = await api.get<Array<{ ip: string; name: string; detail?: string }>>('/api/discover/twinkly');
+        setFound(r.map((d) => ({ label: d.name, detail: d.detail ? `${d.ip} · ${d.detail}` : d.ip, apply: { host: d.ip, name: d.name } })));
       } else if (l.connector === 'govee') {
         const r = await api.get<Array<{ ip: string; sku: string; device: string }>>('/api/discover/govee');
         setFound(r.map((d) => ({ label: `${d.sku} ${d.device.slice(-5)}`, detail: d.ip, apply: { ip: d.ip, sku: d.sku, name: `Govee ${d.sku}` } })));

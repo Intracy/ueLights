@@ -313,7 +313,17 @@ export async function buildApp() {
     }
     if (!item) return;
     if (item.connector === 'govee') registry.govee.start();
-    registry.get(item);
+    const driver = registry.get(item);
+    // Twinkly: LED-Anzahl und Stränge gleich beim Speichern vom Gerät lesen
+    if (item.connector === 'twinkly' && item.config.host) {
+      driver
+        .probe()
+        .then((res) => {
+          const cur = store.data.lights.find((l) => l.id === item.id);
+          if (cur && res.ok && res.ledCount && res.ledCount !== cur.ledCount) saveLight({ ...cur, ledCount: res.ledCount });
+        })
+        .catch(() => undefined);
+    }
   });
 
   const findLight = (id: string) => store.data.lights.find((l) => l.id === id);
