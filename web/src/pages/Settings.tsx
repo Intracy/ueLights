@@ -132,6 +132,13 @@ export function SettingsPage() {
             )}
           </section>
 
+          <HueSection
+            hue={s.hue}
+            paired={!!settings.hue.appKey}
+            status={conn('hue')}
+            onChange={(v) => up('hue', v)}
+          />
+
           <section className="card">
             <div className="row">
               <h2 className="grow">Home Assistant</h2>
@@ -316,6 +323,96 @@ function StatusText({ state, detail }: { state?: string; detail?: string }) {
       {state === 'ok' ? 'verbunden' : state === 'error' ? 'Fehler' : 'verbindet …'}
       {detail && <span className="muted mono" style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{detail}</span>}
     </span>
+  );
+}
+
+function HueSection({
+  hue,
+  paired,
+  status,
+  onChange,
+}: {
+  hue: Settings['hue'];
+  paired: boolean;
+  status?: { state: string; detail?: string };
+  onChange: (v: Partial<Settings['hue']>) => void;
+}) {
+  const { run, reload, notify } = useData();
+  const [bridges, setBridges] = useState<Array<{ ip: string; name: string; bridgeId?: string }> | null>(null);
+  const [busy, setBusy] = useState<'' | 'search' | 'pair' | 'import'>('');
+
+  const search = async () => {
+    setBusy('search');
+    setBridges(null);
+    const r = await run(() => api.get<Array<{ ip: string; name: string; bridgeId?: string }>>('/api/hue/bridges'));
+    setBridges(r ?? []);
+    if (r?.length === 1 && !hue.bridgeIp) onChange({ bridgeIp: r[0].ip });
+    setBusy('');
+  };
+  const pair = async () => {
+    setBusy('pair');
+    const r = await run(() => api.post<{ ok: boolean }>('/api/hue/pair', { ip: hue.bridgeIp }), 'Hue Bridge gekoppelt');
+    if (r) await reload();
+    setBusy('');
+  };
+  const importAll = async () => {
+    setBusy('import');
+    const r = await run(() => api.post<{ added: number; groups: number; total: number }>('/api/hue/import'));
+    if (r) {
+      await reload();
+      notify(`${r.added} von ${r.total} Hue-Lampen neu angelegt, ${r.groups} Raum-Gruppen`);
+    }
+    setBusy('');
+  };
+
+  return (
+    <section className="card">
+      <div className="row">
+        <h2 className="grow">Philips Hue</h2>
+        <StatusText state={status?.state as never} detail={status?.detail} />
+      </div>
+      <Switch checked={hue.enabled} onChange={(v) => onChange({ enabled: v })} label="Verbindung aktiv" />
+      <div className="row" style={{ alignItems: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
+        <div className="grow">
+          <Field label="Bridge-Adresse" hint="Lokal über die Hue Bridge (API v2), ohne Hue-Cloud.">
+            <input value={hue.bridgeIp} onChange={(e) => onChange({ bridgeIp: e.target.value.trim() })} placeholder="192.168.0.20" />
+          </Field>
+        </div>
+        <button className="btn tonal" onClick={search} disabled={!!busy}>
+          <Icon name={busy === 'search' ? 'hourglass_top' : 'radar'} />
+          {busy === 'search' ? 'Suche …' : 'Suchen'}
+        </button>
+      </div>
+      {bridges && bridges.length === 0 && <span className="small muted">Keine Bridge gefunden. Adresse aus der Hue-App (Einstellungen → Bridges) eintragen.</span>}
+      {bridges && bridges.length > 0 && (
+        <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+          {bridges.map((b) => (
+            <button key={b.ip} className="chip" onClick={() => onChange({ bridgeIp: b.ip })}>
+              <Icon name="router" />
+              {b.name} <span className="mono small muted">{b.ip}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="card" style={{ background: 'var(--surface)', gap: 8 }}>
+        <span className="small">
+          {paired
+            ? 'Gekoppelt. Zum erneuten Koppeln wieder die Link-Taste drücken.'
+            : '1. Runde Link-Taste oben auf der Hue Bridge drücken. 2. Innerhalb von 30 Sekunden hier auf „Koppeln“ klicken.'}
+        </span>
+        <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          <button className="btn" onClick={pair} disabled={!!busy || !hue.bridgeIp}>
+            <Icon name={busy === 'pair' ? 'hourglass_top' : 'link'} />
+            {paired ? 'Neu koppeln' : 'Koppeln'}
+          </button>
+          <button className="btn tonal" onClick={importAll} disabled={!!busy || !paired}>
+            <Icon name={busy === 'import' ? 'hourglass_top' : 'playlist_add'} />
+            Alle Hue-Lampen übernehmen
+          </button>
+        </div>
+        <span className="small muted">Legt jede Lampe als Licht an und je Raum eine Gruppe. Räume und Zonen als Ganzes gibt es unter Lichter → Philips Hue → Suchen.</span>
+      </div>
+    </section>
   );
 }
 

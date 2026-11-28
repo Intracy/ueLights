@@ -13,7 +13,7 @@
 
 <p align="center">
   <b>Spenden, Bits, Subs, Raids und Kanalpunkte aus StreamElements lösen echte Lichtshows aus –<br>
-  auf Twinkly, Govee, amaran und allem, was in Home Assistant hängt. Automatisch, in Stufen, ohne Cloud.</b>
+  auf Twinkly, Govee, amaran, Philips Hue und allem, was in Home Assistant hängt. Automatisch, in Stufen, ohne Cloud.</b>
 </p>
 
 <p align="center">
@@ -98,10 +98,10 @@ Beim ersten Öffnen legst du ein Passwort fest. Danach in **Einstellungen → St
 | **🪜 Bedingungen & Stufen** | Betrag *genau / von–bis / ab*, beliebig viele Stufen mit Prüfung auf Lücken und Überschneidungen, Text in der Nachricht, Kanalpunkte-Belohnung, Plattform, Sub-Stufe, Testevents an/aus. Ein exakter Betrag (z. B. 13,37 €) schlägt jeden Bereich. |
 | **🎬 Alert-Builder** | Beliebig viele Alerts. Pro Alert bzw. Stufe beliebig viele **Licht-Spuren** (Licht oder Gruppe + Effekt + Start + Dauer) auf einer Zeitleiste. Priorität per Reihenfolge, Cooldown, „zusätzlich ausführen“. |
 | **🌈 Eigene Effekte** | Statisch, Puls, Strobe, Farbwechsel, Regenbogen, Lauflicht, Füllstand, Überblenden, mit Live-Vorschau im Browser. Derselbe Renderer läuft auf dem Server, die Vorschau entspricht also genau dem, was die Lichter zeigen. |
-| **🏭 Hersteller-Effekte** | Twinkly-Movies, Playlists und eingebaute Effekte · Govee-App-Szenen (lokal per `ptReal`) · amaran-Effekte, Presets und Szenen · Home-Assistant-Effekte, Szenen und Skripte |
+| **🏭 Hersteller-Effekte** | Twinkly-Movies, Playlists und eingebaute Effekte · Govee-App-Szenen (lokal per `ptReal`) · amaran-Effekte, Presets, Quickshots und Szenen · Hue-Szenen (auch dynamisch) und Lampen-Effekte wie Kerze und Kaminfeuer · Home-Assistant-Effekte, Szenen und Skripte |
 | **💶 Betrag als Parameter** | Helligkeit, Füllstand oder Dauer wachsen mit der Höhe der Spende oder der Bits |
 | **🎨 Farbe aus dem Chat** | Kanalpunkte „Farbe wählen: blau“ oder `!farbe #ff00ff` färben die Lichter (Farbwörter auf Deutsch/Englisch und Hex) |
-| **💡 Lichter** | Twinkly (Echtzeit pro LED), Govee LAN, amaran Desktop, Home Assistant, Webhook, **virtuelle Lichter** zum Testen. Gerätesuche im Netz, Gruppen über Hersteller hinweg, Ruhezustand je Licht (wie vorher / aus / Farbe / Hersteller-Effekt). |
+| **💡 Lichter** | Twinkly (Echtzeit pro LED), Govee LAN, amaran Desktop, Philips Hue (Lampen, Räume, Zonen), Home Assistant, Webhook, **virtuelle Lichter** zum Testen. Gerätesuche im Netz, Gruppen über Hersteller hinweg, Ruhezustand je Licht (wie vorher / aus / Farbe / Hersteller-Effekt). |
 | **🛡️ Sicherheit** | Flacker-Schutz (Standard: max. 3 Blitze/s), Bildlicht-Sperre, Ruhezeiten, Pause, Alles stoppen, Verwerfen alter Events nach einem Reconnect, Limit für die Warteschlange, Login mit Passwort |
 | **📡 Live** | Feed mit Status je Event, Anzeige „läuft gerade“ mit Fortschritt, Warteschlange, erneut abspielen, Testevents mit einem Klick, virtuelle LED-Streifen |
 | **🧰 Betrieb** | Docker/Compose mit Synology-Auto-Update (Aufgabenplaner, Rollback), Windows- und Mac-Skripte mit Autostart und Update, PWA fürs iPad/iPhone, Backup/Import als JSON (ohne Geheimnisse), CI mit Tests |
@@ -152,6 +152,7 @@ flowchart LR
   P -- "HTTP + UDP 7777" --> TW["Twinkly"]
   P -- "UDP 4003 · ptReal" --> GV["Govee LAN"]
   P -- "WebSocket 33782" --> AM["amaran Desktop"]
+  P -- "HTTPS (CLIP v2)" --> HUE["Hue Bridge"]
   P -- "WebSocket" --> HA["Home Assistant"]
   P -- "HTTP POST" --> WH["Webhook"]
   S <-- "REST + Live-WebSocket" --> UI["Web-App / PWA"]
@@ -191,6 +192,17 @@ flowchart LR
 ```
 
 Snapshots aus der Govee-App liegen nur in Govees Cloud und sind lokal nicht erreichbar.
+</details>
+
+<details>
+<summary><b>Philips Hue</b>: lokal über die Hue Bridge</summary>
+
+- **Einstellungen → Philips Hue → Suchen** findet die Bridge im Netz (SSDP/mDNS, ohne Hue-Cloud). Alternativ die IP aus der Hue-App eintragen.
+- **Runde Link-Taste** auf der Bridge drücken, dann innerhalb von 30 Sekunden **Koppeln**. ueLights merkt sich Schlüssel und Zertifikat der Bridge; meldet sich später ein anderes Gerät unter der Adresse, verweigert ueLights die Verbindung.
+- **Alle Hue-Lampen übernehmen** legt jede Lampe als Licht an und je Raum eine Gruppe („Hue: Wohnzimmer“). Mehrfach ausführen ist unbedenklich, neue Lampen kommen dazu.
+- Ganze **Räume, Zonen** oder „Alle Hue-Lampen“ gibt es unter *Lichter → Philips Hue → Suchen*. Ein Raum schaltet alle Lampen gleichzeitig, ist aber auf etwa einen Befehl pro Sekunde begrenzt; für schnelle Effekte besser einzelne Lampen nehmen.
+- Szenen des Raums (statisch und dynamisch) und Lampen-Effekte (Kerze, Kaminfeuer, Funkeln …) stehen als Hersteller-Effekte bereit. Nach dem Alert stellt ueLights Farbe und Helligkeit jeder Lampe wieder her.
+- Die Bridge verträgt etwa 10 Befehle pro Sekunde. ueLights fasst schnelle Farbwechsel zusammen, sodass immer der neueste Stand ankommt.
 </details>
 
 <details>
@@ -376,6 +388,7 @@ npm run build
 - **Twinkly Strings HD** ist in der xled-Doku nicht getestet. Vor dem ersten Einsatz „Prüfen“ und einen Effekt testen.
 - **amaran:** Das Key-Format (Hex, Base64 oder Text) ist nicht öffentlich dokumentiert; ueLights akzeptiert alle drei. Lehnt die Desktop-App den Key ab, zeigt die Statuszeile „API-Key abgelehnt“. Der Befehl für Szenen ist konfigurierbar.
 - **Govee-Szenen mit Parametern** sind inoffiziell umgesetzt.
+- **Philips Hue** läuft über normale Befehle, nicht über die Entertainment-API. Pro-LED-Effekte wie bei Twinkly gibt es dort deshalb nicht, dafür braucht es keinen Entertainment-Bereich.
 - Sitzungen liegen im Speicher; nach einem Neustart des Servers einmal neu anmelden.
 
 ## 🗺️ Roadmap

@@ -8,6 +8,7 @@ const CONNECTOR_ICONS: Record<ConnectorType, string> = {
   twinkly: 'light_group',
   govee: 'wb_iridescent',
   amaran: 'highlight',
+  hue: 'emoji_objects',
   homeassistant: 'home',
   virtual: 'view_week',
   webhook: 'webhook',
@@ -94,7 +95,7 @@ function blankLight(connector: ConnectorType): Light {
 function LightCard({ light, onEdit }: { light: Light; onEdit: () => void }) {
   const { save, remove, run, setLightLocal } = useData();
   const [probe, setProbe] = useState<{ ok: boolean; detail?: string } | null>(null);
-  const address = light.config.host ?? light.config.ip ?? light.config.entityId ?? light.config.nodeId ?? light.config.url ?? (light.connector === 'virtual' ? `${light.config.ledCount ?? 60} LEDs` : '');
+  const address = (light.connector === 'hue' ? (light.config.hueType === 'grouped_light' ? 'Raum/Zone' : 'Lampe') : undefined) ?? light.config.host ?? light.config.ip ?? light.config.entityId ?? light.config.nodeId ?? light.config.url ?? (light.connector === 'virtual' ? `${light.config.ledCount ?? 60} LEDs` : '');
   return (
     <div className={`card ${light.enabled ? '' : 'off'}`} style={{ gap: 12, opacity: light.enabled ? 1 : 0.6 }}>
       <div className="row" style={{ flexWrap: 'nowrap' }}>
@@ -197,6 +198,15 @@ function LightEditor({ light, onClose }: { light: Light; onClose: () => void }) 
       } else if (l.connector === 'homeassistant') {
         const r = await api.get<Array<{ entityId: string; name: string; effects: number }>>('/api/discover/homeassistant');
         setFound(r.map((d) => ({ label: d.name, detail: `${d.entityId}${d.effects ? ` · ${d.effects} Effekte` : ''}`, apply: { entityId: d.entityId, name: d.name } })));
+      } else if (l.connector === 'hue') {
+        const r = await api.get<Array<{ id: string; type: 'light' | 'grouped_light'; name: string; kind: string; color: boolean }>>('/api/discover/hue');
+        setFound(
+          r.map((d) => ({
+            label: d.name,
+            detail: `${d.kind}${d.type === 'light' && !d.color ? ' · nur Weiß' : ''}`,
+            apply: { hueId: d.id, hueType: d.type, name: d.name },
+          })),
+        );
       } else if (l.connector === 'amaran') {
         const r = await api.get<Array<{ nodeId: string; name: string }>>('/api/discover/amaran');
         setFound(r.map((d) => ({ label: d.name, detail: d.nodeId, apply: { nodeId: d.nodeId, name: d.name } })));
@@ -208,10 +218,11 @@ function LightEditor({ light, onClose }: { light: Light; onClose: () => void }) 
     }
   };
 
-  const canDiscover = ['twinkly', 'govee', 'homeassistant', 'amaran'].includes(l.connector);
+  const canDiscover = ['twinkly', 'govee', 'hue', 'homeassistant', 'amaran'].includes(l.connector);
   const hint: Partial<Record<ConnectorType, string>> = {
     twinkly: 'Lokale xled-API (HTTP + UDP 7777). Feste IP im Router reservieren.',
     govee: '„LAN Control“ in der Govee-Home-App für das Gerät einschalten. UDP 4001–4003 im Netz erlauben.',
+    hue: 'Über die Hue Bridge im lokalen Netz. Erst unter Einstellungen → Philips Hue koppeln, dann hier Lampe, Raum oder Zone suchen.',
     amaran: `Über die amaran-Desktop-App (${settings.amaran.url}). In den Einstellungen aktivieren.`,
     homeassistant: `Über Home Assistant (${settings.homeassistant.url}). In den Einstellungen aktivieren.`,
     virtual: 'Zeigt Effekte nur in der Web-App (Live-Seite) – zum Testen ohne Hardware.',
@@ -316,6 +327,11 @@ function LightEditor({ light, onClose }: { light: Light; onClose: () => void }) 
               <input value={l.config.sku ?? ''} onChange={(e) => setCfg({ sku: e.target.value.trim() })} placeholder="H6076" />
             </Field>
           </>
+        )}
+        {l.connector === 'hue' && (
+          <Field label="Hue-Ressource" hint={l.config.hueId ? `${l.config.hueType === 'grouped_light' ? 'Raum/Zone' : 'Lampe'} gewählt` : 'Oben „Suchen“ und Lampe, Raum oder Zone wählen'}>
+            <input value={l.config.hueId ?? ''} readOnly className="mono" />
+          </Field>
         )}
         {l.connector === 'amaran' && (
           <Field label="Node-ID">

@@ -128,12 +128,13 @@ export interface Effect {
 
 // ----------------------------- Lichter -------------------------------------
 
-export type ConnectorType = 'twinkly' | 'govee' | 'amaran' | 'homeassistant' | 'virtual' | 'webhook';
+export type ConnectorType = 'twinkly' | 'govee' | 'amaran' | 'hue' | 'homeassistant' | 'virtual' | 'webhook';
 
 export const CONNECTOR_LABELS: Record<ConnectorType, string> = {
   twinkly: 'Twinkly',
   govee: 'Govee',
   amaran: 'amaran',
+  hue: 'Philips Hue',
   homeassistant: 'Home Assistant',
   virtual: 'Virtuell',
   webhook: 'Webhook',
@@ -163,6 +164,9 @@ export interface LightConfig {
   sku?: string;
   // amaran
   nodeId?: string;
+  // hue: Ressource auf der Bridge (Lampe oder Raum/Zone)
+  hueId?: string;
+  hueType?: 'light' | 'grouped_light';
   // homeassistant
   entityId?: string;
   // virtual
@@ -275,6 +279,15 @@ export interface Settings {
     presetCommand: string;
     sceneCommand: string;
   };
+  hue: {
+    enabled: boolean;
+    bridgeIp: string;
+    /** Application Key aus der Kopplung (geheim) */
+    appKey: string;
+    clientKey: string;
+    /** SHA-256-Fingerabdruck des Bridge-Zertifikats, beim Koppeln gemerkt */
+    certFingerprint: string;
+  };
   safety: {
     maxFlashHz: number;
     staleEventSec: number;
@@ -316,6 +329,7 @@ export const DEFAULT_SETTINGS: Settings = {
     presetCommand: 'set_preset',
     sceneCommand: 'set_scene',
   },
+  hue: { enabled: false, bridgeIp: '', appKey: '', clientKey: '', certFingerprint: '' },
   safety: {
     maxFlashHz: 3,
     staleEventSec: 30,

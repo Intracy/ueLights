@@ -2,16 +2,18 @@ import type { Light, Settings } from '@uelights/shared';
 import { AmaranClient, AmaranDriver } from './amaran.js';
 import { GoveeDriver, GoveeLan } from './govee.js';
 import { HomeAssistantClient, HomeAssistantDriver } from './homeassistant.js';
+import { HueClient, HueDriver } from './hue.js';
 import { TwinklyDriver } from './twinkly.js';
 import type { LightDriver } from './types.js';
 import { VirtualDriver, WebhookDriver } from './virtual.js';
 
-/** Hält je Licht einen Treiber und die gemeinsamen Verbindungen (Govee-UDP, amaran, Home Assistant). */
+/** Hält je Licht einen Treiber und die gemeinsamen Verbindungen (Govee-UDP, amaran, Hue, Home Assistant). */
 export class DriverRegistry {
   private drivers = new Map<string, { driver: LightDriver; key: string }>();
   readonly govee = new GoveeLan();
   readonly amaran: AmaranClient;
   readonly ha: HomeAssistantClient;
+  readonly hue: HueClient;
 
   constructor(
     private getSettings: () => Settings,
@@ -22,6 +24,7 @@ export class DriverRegistry {
   ) {
     this.amaran = new AmaranClient(() => getSettings().amaran, onStatus, amaranKey);
     this.ha = new HomeAssistantClient(() => getSettings().homeassistant, haToken, onStatus);
+    this.hue = new HueClient(() => getSettings().hue, onStatus);
   }
 
   /** Treiber holen; bei geänderter Konfiguration neu anlegen. */
@@ -47,6 +50,8 @@ export class DriverRegistry {
         return new GoveeDriver(light, this.govee);
       case 'amaran':
         return new AmaranDriver(light, this.amaran, () => this.getSettings().amaran);
+      case 'hue':
+        return new HueDriver(light, this.hue, () => this.getSettings().colorCommandRate);
       case 'homeassistant':
         return new HomeAssistantDriver(light, this.ha);
       case 'webhook':
@@ -67,5 +72,6 @@ export class DriverRegistry {
     this.govee.stop();
     this.amaran.stop();
     this.ha.stop();
+    this.hue.stop();
   }
 }

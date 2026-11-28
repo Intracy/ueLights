@@ -23,6 +23,7 @@ import { config } from './config.js';
 import { parseSceneCatalog } from './connectors/govee.js';
 import { DriverRegistry } from './connectors/registry.js';
 import { discoverTwinkly } from './connectors/twinkly.js';
+import { discoverHueBridges, pairHueBridge } from './connectors/hue.js';
 import { AlertEngine } from './engine/engine.js';
 import { Player } from './engine/player.js';
 import { EventPipeline } from './events/pipeline.js';
@@ -103,7 +104,7 @@ export async function buildApp() {
   );
 
   function liveState(): LiveState {
-    const conns = [se.status, registry.ha.status, registry.amaran.status];
+    const conns = [se.status, registry.ha.status, registry.amaran.status, registry.hue.status];
     if (store.data.lights.some((l) => l.connector === 'govee')) {
       conns.push({
         id: 'govee',
@@ -126,6 +127,7 @@ export async function buildApp() {
     se.restart();
     registry.ha.restart();
     registry.amaran.restart();
+    registry.hue.restart();
     if (store.data.lights.some((l) => l.connector === 'govee')) registry.govee.start();
   };
 
@@ -187,6 +189,8 @@ export async function buildApp() {
     s.streamelements.jwt = mask(s.streamelements.jwt);
     s.homeassistant.token = mask(s.homeassistant.token);
     s.amaran.apiKey = mask(s.amaran.apiKey);
+    s.hue.appKey = mask(s.hue.appKey);
+    s.hue.clientKey = mask(s.hue.clientKey);
     return {
       ...s,
       meta: {
@@ -216,13 +220,16 @@ export async function buildApp() {
     if (!next.streamelements.jwt || next.streamelements.jwt.startsWith(MASK)) next.streamelements.jwt = cur.streamelements.jwt;
     if (!next.homeassistant.token || next.homeassistant.token.startsWith(MASK)) next.homeassistant.token = cur.homeassistant.token;
     if (next.amaran.apiKey === undefined || next.amaran.apiKey.startsWith(MASK)) next.amaran.apiKey = cur.amaran.apiKey;
+    // Hue-Schlüssel und Zertifikat setzt nur das Koppeln
+    next.hue = { ...cur.hue, ...(next.hue ?? {}), appKey: cur.hue.appKey, clientKey: cur.hue.clientKey, certFingerprint: cur.hue.certFingerprint };
+    if (next.hue.bridgeIp !== cur.hue.bridgeIp) next.hue = { ...next.hue, appKey: '', clientKey: '', certFingerprint: '' };
     delete (next as unknown as Record<string, unknown>).meta;
     // Pause wird nur über /api/pause geschaltet
     next.safety = { ...next.safety, paused: cur.safety.paused };
     if (next.triggerMode !== 'auto' && next.triggerMode !== 'manual') next.triggerMode = cur.triggerMode;
     const reconnect =
-      JSON.stringify([cur.streamelements, cur.homeassistant, cur.amaran]) !==
-      JSON.stringify([next.streamelements, next.homeassistant, next.amaran]);
+      JSON.stringify([cur.streamelements, cur.homeassistant, cur.amaran, cur.hue]) !==
+      JSON.stringify([next.streamelements, next.homeassistant, next.amaran, next.hue]);
     store.data.settings = next;
     store.commit();
     if (reconnect) restartConnections();
@@ -445,6 +452,76 @@ export async function buildApp() {
     if (registry.ha.status.state !== 'ok') return fail(reply, 503, 'Home Assistant ist nicht verbunden');
     return registry.ha.entities();
   });
+  // Philips Hue
+  app.get('/api/hue/bridges', async () => discoverHueBridges());
+  app.post<{ Body: { ip: string } }>('/api/hue/pair', async (req, reply) => {
+    const ip = String(req.body?.ip ?? '').trim();
+    if (!/^[\w.:-]+$/.test(ip)) return fail(reply, 400, 'Ungültige Adresse');
+    try {
+      const r = await pairHueBridge(ip);
+      S().hue = { enabled: true, bridgeIp: ip, appKey: r.appKey, clientKey: r.clientKey ?? '', certFingerprint: r.fingerprint ?? '' };
+      store.commit();
+      await registry.hue.restart();
+      pushState();
+      return { ok: true, status: registry.hue.status };
+    } catch (err) {
+      return fail(reply, 409, (err as Error).message);
+    }
+  });
+  app.get('/api/discover/hue', async (_req, reply) => {
+    if (!registry.hue.configured) return fail(reply, 503, 'Hue Bridge ist nicht gekoppelt');
+    try {
+      return await registry.hue.targets();
+    } catch (err) {
+      return fail(reply, 503, (err as Error).message);
+    }
+  });
+  /** Alle Hue-Lampen als Lichter anlegen, je Raum eine Gruppe */
+  app.post('/api/hue/import', async (_req, reply) => {
+    if (!registry.hue.configured) return fail(reply, 503, 'Hue Bridge ist nicht gekoppelt');
+    let targets;
+    try {
+      targets = await registry.hue.targets();
+    } catch (err) {
+      return fail(reply, 503, (err as Error).message);
+    }
+    const known = new Set(store.data.lights.filter((l) => l.connector === 'hue').map((l) => l.config.hueId));
+    let added = 0;
+    const byRoom = new Map<string, string[]>();
+    for (const t of targets.filter((x) => x.type === 'light')) {
+      let light = store.data.lights.find((l) => l.connector === 'hue' && l.config.hueId === t.id);
+      if (!known.has(t.id)) {
+        light = {
+          id: newId('li'),
+          name: t.name,
+          connector: 'hue',
+          config: { hueId: t.id, hueType: 'light' },
+          role: 'deco',
+          restState: { mode: 'snapshot' },
+          nativeEffects: [],
+          enabled: true,
+        };
+        store.data.lights.push(light);
+        added++;
+      }
+      if (t.groupId && light) byRoom.set(t.groupId, [...(byRoom.get(t.groupId) ?? []), light.id]);
+    }
+    const rooms = new Map(targets.filter((t) => t.kind === 'Raum').map((t) => [t.groupId!, t.name]));
+    let groups = 0;
+    for (const [roomId, ids] of byRoom) {
+      const name = `Hue: ${rooms.get(roomId) ?? 'Raum'}`;
+      const g = store.data.groups.find((x) => x.name === name);
+      if (g) g.lightIds = [...new Set([...g.lightIds, ...ids])];
+      else {
+        store.data.groups.push({ id: newId('grp'), name, lightIds: ids });
+        groups++;
+      }
+    }
+    store.commit();
+    pushState();
+    return { ok: true, added, groups, total: targets.filter((x) => x.type === 'light').length };
+  });
+
   app.get('/api/discover/amaran', async (_req, reply) => {
     try {
       return await registry.amaran.devices();
@@ -459,6 +536,7 @@ export async function buildApp() {
     const { jwt: _jwt, ...seRest } = s.streamelements;
     const { token: _tok, ...haRest } = s.homeassistant;
     const { apiKey: _ak, ...amRest } = s.amaran;
+    const { appKey: _hk, clientKey: _hc, certFingerprint: _hf, ...hueRest } = s.hue;
     const backup: Backup = {
       version: 1,
       exportedAt: new Date().toISOString(),
@@ -466,7 +544,7 @@ export async function buildApp() {
       effects: store.data.effects,
       lights: store.data.lights,
       groups: store.data.groups,
-      settings: { ...s, streamelements: seRest, homeassistant: haRest, amaran: amRest as Settings['amaran'] },
+      settings: { ...s, streamelements: seRest, homeassistant: haRest, amaran: amRest as Settings['amaran'], hue: hueRest as Settings['hue'] },
     };
     reply.header('Content-Disposition', `attachment; filename="uelights-backup-${new Date().toISOString().slice(0, 10)}.json"`);
     return backup;
@@ -485,6 +563,7 @@ export async function buildApp() {
         streamelements: { ...b.settings.streamelements, jwt: cur.streamelements.jwt },
         homeassistant: { ...b.settings.homeassistant, token: cur.homeassistant.token },
         amaran: { ...cur.amaran, ...b.settings.amaran, apiKey: cur.amaran.apiKey },
+        hue: { ...cur.hue, ...(b.settings.hue ?? {}), appKey: cur.hue.appKey, clientKey: cur.hue.clientKey, certFingerprint: cur.hue.certFingerprint },
       };
     }
     store.commit();
