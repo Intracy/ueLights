@@ -18,3 +18,15 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  docker:
+    # Gleicher Build wie auf der Synology (nas/uelights-update.sh), inkl. Start-Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t uelights:ci .
+      - name: Container starten und Health-Check
+        run: |
+          docker run -d --name uel -p 8787:8787 uelights:ci
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8787/api/health && exit 0; sleep 1; done
+          docker logs uel; exit 1
