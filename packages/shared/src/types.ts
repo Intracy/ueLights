@@ -268,6 +268,8 @@ export interface Settings {
     enabled: boolean;
     url: string;
     clientId: string;
+    /** Schlüssel aus der amaran-OpenAPI-Freischaltung; signiert jede Anfrage (bleibt lokal) */
+    apiKey: string;
     /** Skalierung der Intensität (100 = Prozent, 1000 = Promille) */
     intensityScale: number;
     presetCommand: string;
@@ -309,7 +311,8 @@ export const DEFAULT_SETTINGS: Settings = {
     enabled: false,
     url: 'ws://192.168.178.20:33782/ws',
     clientId: 'uelights',
-    intensityScale: 100,
+    apiKey: '',
+    intensityScale: 1000,
     presetCommand: 'set_preset',
     sceneCommand: 'set_scene',
   },

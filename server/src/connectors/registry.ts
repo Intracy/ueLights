@@ -16,10 +16,11 @@ export class DriverRegistry {
   constructor(
     private getSettings: () => Settings,
     haToken: string,
+    amaranKey: string,
     onStatus: () => void,
     private emitVirtual: (lightId: string, leds: string[]) => void,
   ) {
-    this.amaran = new AmaranClient(() => getSettings().amaran, onStatus);
+    this.amaran = new AmaranClient(() => getSettings().amaran, onStatus, amaranKey);
     this.ha = new HomeAssistantClient(() => getSettings().homeassistant, haToken, onStatus);
   }
 

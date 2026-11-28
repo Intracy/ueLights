@@ -155,6 +155,22 @@ export function SettingsPage() {
             <Field label="WebSocket-Adresse" hint="Rechner mit amaran Desktop, Standard-Port 33782. Die App muss während des Streams laufen.">
               <input value={s.amaran.url} onChange={(e) => up('amaran', { url: e.target.value.trim() })} />
             </Field>
+            <Field
+              label="OpenAPI-Key"
+              hint={
+                settings.meta.amaranKeyFromEnv
+                  ? 'Wird per Umgebungsvariable AMARAN_API_KEY gesetzt.'
+                  : 'Aus amaran Desktop → Benutzerzentrum → OpenAPI. Signiert jede Anfrage, bleibt im lokalen Netz.'
+              }
+            >
+              <input
+                type="password"
+                autoComplete="off"
+                value={s.amaran.apiKey ?? ''}
+                disabled={!!settings.meta.amaranKeyFromEnv}
+                onChange={(e) => up('amaran', { apiKey: e.target.value.trim() })}
+              />
+            </Field>
             <details>
               <summary className="small muted" style={{ cursor: 'pointer' }}>
                 Erweitert
@@ -163,7 +179,7 @@ export function SettingsPage() {
                 <Field label="Client-ID" compact>
                   <input value={s.amaran.clientId} onChange={(e) => up('amaran', { clientId: e.target.value })} />
                 </Field>
-                <Field label="Intensitäts-Skala" compact hint="100 = Prozent, 1000 = Promille">
+                <Field label="Intensitäts-Skala" compact hint="1000 = Promille (aktuelle Desktop-App), 100 = Prozent">
                   <NumberInput value={s.amaran.intensityScale} min={1} onChange={(v) => up('amaran', { intensityScale: Math.round(v) })} />
                 </Field>
                 <Field label="Befehl für Presets" compact>

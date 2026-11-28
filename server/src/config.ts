@@ -11,6 +11,7 @@ export const config = {
   seJwt: process.env.SE_JWT ?? '',
   /** Optional: Home-Assistant-Token per Umgebungsvariable */
   haToken: process.env.HA_TOKEN ?? '',
+  amaranKey: process.env.AMARAN_API_KEY ?? '',
   /** Pfad zum gebauten Web-Frontend */
   webDir: path.resolve(process.env.WEB_DIR ?? './web/dist'),
   /** Login abschalten (nur für Tests / reines Heimnetz ohne Freigabe) */

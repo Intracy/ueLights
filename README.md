@@ -198,7 +198,8 @@ Snapshots aus der Govee-App liegen nur in Govees Cloud und sind lokal nicht erre
 
 - **amaran Desktop** (Mac/Windows) muss laufen. Die App hält die Bluetooth-Verbindung zu den Leuchten und öffnet einen lokalen WebSocket (Standard-Port **33782**).
 - **Einstellungen → amaran Desktop:** `ws://<Rechner-IP>:33782/ws` eintragen, aktivieren. Läuft ueLights unter Windows auf demselben PC, genügt `ws://localhost:33782/ws`.
-- **Lichter → amaran → Suchen** listet die Leuchten. Eingebaute Effekte, Presets und Szenen werden eingelesen.
+- **OpenAPI-Key** (amaran Desktop → Benutzerzentrum → OpenAPI beantragen) unter *Einstellungen → amaran Desktop* eintragen oder per `AMARAN_API_KEY` setzen. Der Key bleibt in ueLights; er signiert jede Anfrage über denselben lokalen WebSocket (AES-256-GCM-Token, Protokoll v2). Ältere Desktop-Versionen ohne Key-Prüfung werden automatisch erkannt.
+- **Lichter → amaran → Suchen** listet die Leuchten. Eingebaute Effekte, Presets, Quickshots und Szenen werden eingelesen.
 - Befehlsnamen für Presets und Szenen sowie die Intensitäts-Skala sind unter *Erweitert* einstellbar.
 - Leuchten, die im Bild ausleuchten, als **Bildlicht** markieren. Alerts schalten sie dann nie.
 </details>
@@ -327,6 +328,7 @@ Daten liegen in `~/Library/Application Support/ueLights`, Logs unter `~/Library/
 | `UELIGHTS_PASSWORD` | – | Passwort fest vorgeben |
 | `SE_JWT` | – | StreamElements-Token |
 | `HA_TOKEN` | – | Home-Assistant-Token |
+| `AMARAN_API_KEY` | – | amaran-OpenAPI-Key |
 | `UELIGHTS_DISABLE_AUTH` | `0` | Login abschalten (nur für Tests) |
 | `LOG_LEVEL` | `info` | `debug` für mehr Ausgabe |
 </details>
@@ -372,7 +374,7 @@ npm run build
 
 - **StreamElements-Felder** unterscheiden sich je Plattform leicht. ueLights liest sie defensiv aus; das Rohformat jedes Events steht in `data/events.json`.
 - **Twinkly Strings HD** ist in der xled-Doku nicht getestet. Vor dem ersten Einsatz „Prüfen“ und einen Effekt testen.
-- **amaran:** Befehlsnamen für Presets und Szenen sind konfigurierbar, weil die OpenAPI-Doku nicht öffentlich lesbar ist.
+- **amaran:** Das Key-Format (Hex, Base64 oder Text) ist nicht öffentlich dokumentiert; ueLights akzeptiert alle drei. Lehnt die Desktop-App den Key ab, zeigt die Statuszeile „API-Key abgelehnt“. Der Befehl für Szenen ist konfigurierbar.
 - **Govee-Szenen mit Parametern** sind inoffiziell umgesetzt.
 - Sitzungen liegen im Speicher; nach einem Neustart des Servers einmal neu anmelden.
 

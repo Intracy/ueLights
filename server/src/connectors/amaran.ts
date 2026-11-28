@@ -1,29 +1,71 @@
+import crypto from 'node:crypto';
 import WebSocket from 'ws';
 import { rgbToHsv, type ConnectionStatus, type Light, type NativeEffect, type Rgb, type Settings } from '@uelights/shared';
 import { DriverError, type DriverCapabilities, type LightDriver } from './types.js';
 
 interface Waiter {
+  action: string;
   resolve: (v: unknown) => void;
   reject: (e: Error) => void;
   timer: NodeJS.Timeout;
 }
 
 /**
- * Verbindung zur amaran-Desktop-App (WebSocket, Standard-Port 33782).
- * Die App hält die Bluetooth-Verbindung zu den Leuchten.
+ * Schlüssel aus dem amaran-OpenAPI-Key: 64 Hex-Zeichen oder Base64 mit 32 Byte direkt,
+ * sonst SHA-256 des Textes. Ohne Key ein Zufallsschlüssel (ältere Desktop-Versionen prüfen nicht).
+ */
+export function amaranKeyBytes(apiKey: string): Buffer {
+  const k = apiKey.trim();
+  if (!k) return crypto.randomBytes(32);
+  if (/^[0-9a-fA-F]{64}$/.test(k)) return Buffer.from(k, 'hex');
+  if (/^[A-Za-z0-9+/_-]+=*$/.test(k)) {
+    const b = Buffer.from(k.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+    if (b.length === 32) return b;
+  }
+  return crypto.createHash('sha256').update(k, 'utf8').digest();
+}
+
+/** Anfrage-Token nach amaran OpenAPI: AES-256-GCM über den Unix-Zeitstempel, Base64 von IV(12) | Tag(16) | Chiffrat */
+export function amaranToken(apiKey: string, now = Date.now()): string {
+  const key = amaranKeyBytes(apiKey);
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const ct = Buffer.concat([cipher.update(String(Math.floor(now / 1000)), 'utf8'), cipher.final()]);
+  return Buffer.concat([iv, cipher.getAuthTag(), ct]).toString('base64');
+}
+
+/**
+ * Verbindung zur amaran-Desktop-App (lokaler WebSocket, Standard-Port 33782).
+ * Die App hält die Bluetooth-Verbindung zu den Leuchten. Protokoll v2 mit signiertem Token je Anfrage;
+ * ältere Desktop-Versionen (v0/v1) werden erkannt und im alten Format angesprochen.
  */
 export class AmaranClient {
   private ws: WebSocket | null = null;
-  private waiters = new Map<string, Waiter[]>();
+  private waiters = new Map<string, Waiter>();
   private retryTimer: NodeJS.Timeout | null = null;
   private stopped = true;
+  private seq = 0;
+  /** ausgehandelte Protokollversion */
+  protocol = 2;
   status: ConnectionStatus = { id: 'amaran', label: 'amaran Desktop', state: 'disabled' };
 
-  constructor(private getSettings: () => Settings['amaran'], private onStatus: () => void) {}
+  constructor(
+    private getSettings: () => Settings['amaran'],
+    private onStatus: () => void,
+    private envKey = '',
+  ) {}
+
+  private get apiKey(): string {
+    return this.envKey || this.getSettings().apiKey || '';
+  }
 
   private setStatus(state: ConnectionStatus['state'], detail?: string) {
     this.status = { ...this.status, state, detail };
     this.onStatus();
+  }
+
+  private okDetail(): string {
+    return `${this.getSettings().url} · Protokoll v${this.protocol}${this.apiKey ? ' · mit API-Key' : ''}`;
   }
 
   restart(): void {
@@ -40,33 +82,42 @@ export class AmaranClient {
     this.ws?.removeAllListeners();
     this.ws?.close();
     this.ws = null;
+    this.rejectAll('amaran getrennt');
     this.setStatus('disabled');
+  }
+
+  private rejectAll(msg: string) {
+    for (const w of this.waiters.values()) {
+      clearTimeout(w.timer);
+      w.reject(new DriverError(msg));
+    }
+    this.waiters.clear();
   }
 
   private connect(): void {
     const s = this.getSettings();
     this.setStatus('connecting', s.url);
+    this.protocol = 2;
     const ws = new WebSocket(s.url);
     this.ws = ws;
-    ws.on('open', () => this.setStatus('ok', s.url));
-    ws.on('message', (buf) => {
-      let msg: Record<string, unknown>;
+    ws.on('open', async () => {
+      this.setStatus('ok', this.okDetail());
       try {
-        msg = JSON.parse(buf.toString());
-      } catch {
-        return;
+        const v = (await this.request('get_protocol_versions', undefined, {}, 2000)) as Record<string, unknown> | unknown[];
+        const list = (Array.isArray(v) ? v : ((v as Record<string, unknown>)?.versions as unknown[])) ?? [];
+        const nums = list.map(Number).filter(Number.isFinite);
+        if (nums.length && !nums.includes(2)) this.protocol = Math.max(...nums);
+      } catch (err) {
+        if (/token|auth|key|forbidden|unauthori/i.test((err as Error).message)) {
+          return this.setStatus('error', `API-Key abgelehnt: ${(err as Error).message}`);
+        }
+        /* ältere Versionen kennen den Befehl nicht – Version kommt dann aus den Antworten */
       }
-      const req = msg.request as Record<string, unknown> | undefined;
-      const type = String(req?.type ?? msg.type ?? '');
-      const w = this.waiters.get(type)?.shift();
-      if (!w) return;
-      clearTimeout(w.timer);
-      if (Number(msg.code ?? 0) !== 0) w.reject(new DriverError(`amaran ${type}: ${msg.message ?? msg.code}`));
-      else w.resolve(msg.data);
+      this.setStatus('ok', this.okDetail());
     });
+    ws.on('message', (buf) => this.onMessage(buf.toString()));
     ws.on('close', () => {
-      for (const list of this.waiters.values()) for (const w of list) w.reject(new DriverError('amaran getrennt'));
-      this.waiters.clear();
+      this.rejectAll('amaran getrennt');
       if (this.stopped) return;
       this.setStatus('connecting', 'Desktop-App nicht erreichbar – neuer Versuch in 10 s');
       this.retryTimer = setTimeout(() => this.connect(), 10_000);
@@ -74,26 +125,54 @@ export class AmaranClient {
     ws.on('error', () => undefined);
   }
 
-  request(type: string, nodeId?: string, args?: Record<string, unknown>, timeoutMs = 3000): Promise<unknown> {
+  private onMessage(raw: string): void {
+    let msg: Record<string, unknown>;
+    try {
+      msg = JSON.parse(raw);
+    } catch {
+      return;
+    }
+    if (typeof msg.version === 'number' && msg.version < 2 && this.protocol >= 2) {
+      this.protocol = msg.version;
+      this.setStatus('ok', this.okDetail());
+    }
+    if (msg.type === 'event') return;
+    const req = msg.request as Record<string, unknown> | undefined;
+    const action = String(msg.action ?? req?.action ?? req?.type ?? (msg.type !== 'response' ? msg.type : '') ?? '');
+    let key = typeof msg.request_id === 'string' && this.waiters.has(msg.request_id) ? msg.request_id : undefined;
+    if (!key) for (const [k, w] of this.waiters) if (w.action === action) { key = k; break; }
+    if (!key) return;
+    const w = this.waiters.get(key)!;
+    this.waiters.delete(key);
+    clearTimeout(w.timer);
+    if (Number(msg.code ?? 0) !== 0) w.reject(new DriverError(`amaran ${w.action}: ${msg.message ?? msg.msg ?? `Fehler ${msg.code}`}`));
+    else w.resolve(msg.data);
+  }
+
+  request(action: string, nodeId?: string, args?: Record<string, unknown>, timeoutMs = 3000): Promise<unknown> {
     const ws = this.ws;
     if (!ws || ws.readyState !== WebSocket.OPEN) return Promise.reject(new DriverError('amaran Desktop nicht verbunden'));
+    const s = this.getSettings();
+    const requestId = `uel-${++this.seq}`;
+    const token = amaranToken(this.apiKey);
+    const msg =
+      this.protocol >= 2
+        ? { version: 2, type: 'request', client_id: s.clientId, request_id: requestId, action, ...(nodeId ? { node_id: nodeId } : {}), args: args ?? {}, token }
+        : { version: this.protocol, client_id: s.clientId, type: action, node_id: nodeId, args: args ?? {}, token };
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
-        const list = this.waiters.get(type) ?? [];
-        this.waiters.set(type, list.filter((x) => x.timer !== timer));
-        reject(new DriverError(`amaran ${type}: keine Antwort`));
+        this.waiters.delete(requestId);
+        reject(new DriverError(`amaran ${action}: keine Antwort`));
       }, timeoutMs);
-      const list = this.waiters.get(type) ?? [];
-      list.push({ resolve, reject, timer });
-      this.waiters.set(type, list);
-      ws.send(JSON.stringify({ version: 1, client_id: this.getSettings().clientId, type, node_id: nodeId, args: args ?? {} }));
+      this.waiters.set(requestId, { action, resolve, reject, timer });
+      ws.send(JSON.stringify(msg));
     });
   }
 
   /** Geräte für den Einrichtungsdialog */
   async devices(): Promise<Array<{ nodeId: string; name: string }>> {
     const data = await this.request('get_device_list');
-    const list = Array.isArray(data) ? data : ((data as Record<string, unknown>)?.list as unknown[]) ?? [];
+    const list = Array.isArray(data) ? data : ((data as Record<string, unknown>)?.list as unknown[]) ?? ((data as Record<string, unknown>)?.devices as unknown[]) ?? [];
     return (list as Array<Record<string, unknown>>)
       .map((d) => ({
         nodeId: String(d.node_id ?? d.nodeId ?? d.id ?? ''),
@@ -106,13 +185,13 @@ export class AmaranClient {
 function listFrom(data: unknown): Array<Record<string, unknown> | string | number> {
   if (Array.isArray(data)) return data;
   const o = data as Record<string, unknown>;
-  for (const k of ['list', 'effects', 'presets', 'scenes', 'items']) if (Array.isArray(o?.[k])) return o[k] as never;
+  for (const k of ['list', 'effects', 'presets', 'quickshots', 'scenes', 'items']) if (Array.isArray(o?.[k])) return o[k] as never;
   return [];
 }
 
 function itemId(it: Record<string, unknown> | string | number): string {
   if (typeof it !== 'object') return String(it);
-  return String(it.effect_type ?? it.type ?? it.id ?? it.preset_id ?? it.scene_id ?? it.name ?? '');
+  return String(it.effect_type ?? it.type ?? it.id ?? it.preset_id ?? it.quickshot_id ?? it.scene_id ?? it.name ?? '');
 }
 
 function itemName(it: Record<string, unknown> | string | number): string {
@@ -143,22 +222,42 @@ export class AmaranDriver implements LightDriver {
 
   async probe() {
     try {
-      await this.client.request('get_node_config', this.node);
-      return { ok: true, detail: `Node ${this.node}` };
+      const sleep = await this.client.request('get_sleep', this.node);
+      const asleep = sleep === true || (sleep as Record<string, unknown>)?.sleep === true;
+      return { ok: true, detail: `Node ${this.node} · ${asleep ? 'Standby' : 'an'} · Protokoll v${this.client.protocol}` };
     } catch (err) {
       return { ok: false, detail: (err as Error).message };
     }
   }
 
   async snapshot(): Promise<unknown> {
-    const cfg = (await this.client.request('get_node_config', this.node)) as Record<string, unknown>;
     let sleep: unknown;
     try {
       sleep = await this.client.request('get_sleep', this.node);
     } catch {
       /* optional */
     }
-    return { cfg, sleep };
+    try {
+      const cfg = (await this.client.request('get_node_config', this.node)) as Record<string, unknown>;
+      return { cfg, sleep };
+    } catch {
+      // Protokoll v2 ohne get_node_config: Weiß und Helligkeit einzeln lesen
+      const cfg: Record<string, unknown> = {};
+      try {
+        const i = (await this.client.request('get_intensity', this.node)) as Record<string, unknown>;
+        cfg.intensity = i?.intensity ?? i;
+      } catch {
+        /* optional */
+      }
+      try {
+        const c = (await this.client.request('get_cct', this.node)) as Record<string, unknown>;
+        if (c?.cct !== undefined) cfg.cct = c.cct;
+        if (c?.intensity !== undefined) cfg.intensity = c.intensity;
+      } catch {
+        /* optional */
+      }
+      return { cfg, sleep };
+    }
   }
 
   async restore(raw: unknown): Promise<void> {
@@ -209,6 +308,15 @@ export class AmaranDriver implements LightDriver {
       /* optional */
     }
     try {
+      const qs = await this.client.request('get_quickshot_list');
+      for (const it of listFrom(qs)) {
+        const id = typeof it === 'object' ? String(it.quickshot_id ?? it.id ?? itemId(it)) : String(it);
+        out.push({ id: `quickshot:${id}`, name: itemName(it), kind: 'quickshot', data: { quickshotId: id } });
+      }
+    } catch {
+      /* optional */
+    }
+    try {
       const sc = await this.client.request('get_scene_list');
       for (const it of listFrom(sc)) out.push({ id: `scene:${itemId(it)}`, name: itemName(it), kind: 'scene', data: { sceneId: itemId(it), raw: it } });
     } catch {
@@ -224,6 +332,8 @@ export class AmaranDriver implements LightDriver {
       await this.client.request('set_system_effect', this.node, { effect_type: n.data?.effectType });
     } else if (n.kind === 'preset') {
       await this.client.request(s.presetCommand, this.node, { preset_id: n.data?.presetId });
+    } else if (n.kind === 'quickshot') {
+      await this.client.request('set_quickshot', undefined, { quickshot_id: n.data?.quickshotId });
     } else if (n.kind === 'scene') {
       await this.client.request(s.sceneCommand, undefined, { scene_id: n.data?.sceneId });
     }

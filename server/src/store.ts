@@ -59,8 +59,9 @@ export class Store {
   }
 
   private load(): StoreData {
-    const fresh: StoreData = {
+    const fresh: StoreData & { settingsRev: number } = {
       version: 1,
+      settingsRev: 2,
       alerts: [],
       effects: seedEffects(),
       lights: [],
@@ -70,7 +71,13 @@ export class Store {
     };
     if (!fs.existsSync(this.file)) return fresh;
     try {
-      const parsed = JSON.parse(fs.readFileSync(this.file, 'utf8')) as Partial<StoreData>;
+      const parsed = JSON.parse(fs.readFileSync(this.file, 'utf8')) as Partial<StoreData> & { settingsRev?: number };
+      // Rev 2: amaran-Intensität in Promille (Protokoll v2); alter Standardwert 100 wird angehoben
+      if ((parsed.settingsRev ?? 1) < 2) {
+        const am = (parsed.settings as unknown as Record<string, Record<string, unknown>> | undefined)?.amaran;
+        if (am && am.intensityScale === 100) am.intensityScale = 1000;
+        parsed.settingsRev = 2;
+      }
       return {
         ...fresh,
         ...parsed,

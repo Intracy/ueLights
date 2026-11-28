@@ -63,7 +63,7 @@ export async function buildApp() {
   };
 
   // ------------------------------ Kern -------------------------------------
-  const registry = new DriverRegistry(S, config.haToken, pushState, (lightId, leds) =>
+  const registry = new DriverRegistry(S, config.haToken, config.amaranKey, pushState, (lightId, leds) =>
     broadcast({ type: 'virtualFrame', lightId, leds }),
   );
   const player = new Player({
@@ -186,11 +186,13 @@ export async function buildApp() {
     const jwt = config.seJwt || s.streamelements.jwt;
     s.streamelements.jwt = mask(s.streamelements.jwt);
     s.homeassistant.token = mask(s.homeassistant.token);
+    s.amaran.apiKey = mask(s.amaran.apiKey);
     return {
       ...s,
       meta: {
         jwtFromEnv: !!config.seJwt,
         haTokenFromEnv: !!config.haToken,
+        amaranKeyFromEnv: !!config.amaranKey,
         passwordFromEnv: !!config.password,
         detectedChannelId: jwt ? channelIdFromJwt(jwt) ?? null : null,
       },
@@ -213,6 +215,7 @@ export async function buildApp() {
     const cur = S();
     if (!next.streamelements.jwt || next.streamelements.jwt.startsWith(MASK)) next.streamelements.jwt = cur.streamelements.jwt;
     if (!next.homeassistant.token || next.homeassistant.token.startsWith(MASK)) next.homeassistant.token = cur.homeassistant.token;
+    if (next.amaran.apiKey === undefined || next.amaran.apiKey.startsWith(MASK)) next.amaran.apiKey = cur.amaran.apiKey;
     delete (next as unknown as Record<string, unknown>).meta;
     // Pause wird nur über /api/pause geschaltet
     next.safety = { ...next.safety, paused: cur.safety.paused };
@@ -455,6 +458,7 @@ export async function buildApp() {
     const s = structuredClone(S()) as Settings;
     const { jwt: _jwt, ...seRest } = s.streamelements;
     const { token: _tok, ...haRest } = s.homeassistant;
+    const { apiKey: _ak, ...amRest } = s.amaran;
     const backup: Backup = {
       version: 1,
       exportedAt: new Date().toISOString(),
@@ -462,7 +466,7 @@ export async function buildApp() {
       effects: store.data.effects,
       lights: store.data.lights,
       groups: store.data.groups,
-      settings: { ...s, streamelements: seRest, homeassistant: haRest },
+      settings: { ...s, streamelements: seRest, homeassistant: haRest, amaran: amRest as Settings['amaran'] },
     };
     reply.header('Content-Disposition', `attachment; filename="uelights-backup-${new Date().toISOString().slice(0, 10)}.json"`);
     return backup;
@@ -480,6 +484,7 @@ export async function buildApp() {
         ...(b.settings as unknown as Settings),
         streamelements: { ...b.settings.streamelements, jwt: cur.streamelements.jwt },
         homeassistant: { ...b.settings.homeassistant, token: cur.homeassistant.token },
+        amaran: { ...cur.amaran, ...b.settings.amaran, apiKey: cur.amaran.apiKey },
       };
     }
     store.commit();
