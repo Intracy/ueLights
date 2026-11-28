@@ -56,6 +56,8 @@ docker compose up -d --build
 
 → `http://<NAS-IP>:8787`
 
+Synology ohne SSH: eine Aufgabe im **Aufgabenplaner** installiert und aktualisiert alles selbst ([Anleitung](#synology-aufgabenplaner)).
+
 </td>
 <td width="33%" valign="top">
 
@@ -102,7 +104,7 @@ Beim ersten Öffnen legst du ein Passwort fest. Danach in **Einstellungen → St
 | **💡 Lichter** | Twinkly (Echtzeit pro LED), Govee LAN, amaran Desktop, Home Assistant, Webhook, **virtuelle Lichter** zum Testen. Gerätesuche im Netz, Gruppen über Hersteller hinweg, Ruhezustand je Licht (wie vorher / aus / Farbe / Hersteller-Effekt). |
 | **🛡️ Sicherheit** | Flacker-Schutz (Standard: max. 3 Blitze/s), Bildlicht-Sperre, Ruhezeiten, Pause, Alles stoppen, Verwerfen alter Events nach einem Reconnect, Limit für die Warteschlange, Login mit Passwort |
 | **📡 Live** | Feed mit Status je Event, Anzeige „läuft gerade“ mit Fortschritt, Warteschlange, erneut abspielen, Testevents mit einem Klick, virtuelle LED-Streifen |
-| **🧰 Betrieb** | Docker/Compose, Windows- und Mac-Skripte mit Autostart und Update, PWA fürs iPad/iPhone, Backup/Import als JSON (ohne Geheimnisse), CI mit Tests |
+| **🧰 Betrieb** | Docker/Compose mit Synology-Auto-Update (Aufgabenplaner, Rollback), Windows- und Mac-Skripte mit Autostart und Update, PWA fürs iPad/iPhone, Backup/Import als JSON (ohne Geheimnisse), CI mit Tests |
 
 ## 📸 Screenshots
 
@@ -243,7 +245,39 @@ services:
       - ./data:/data
 ```
 
-Synology: *Container Manager → Projekt → Erstellen*, den Repo-Ordner wählen. Von unterwegs z. B. per Tailscale erreichbar.
+Von unterwegs z. B. per Tailscale erreichbar.
+</details>
+
+<a id="synology-aufgabenplaner"></a>
+<details open>
+<summary><b>Synology: automatisch installieren und aktuell halten (Aufgabenplaner)</b></summary>
+
+Eine einzige geplante Aufgabe installiert ueLights beim ersten Lauf und hält es danach aktuell. Git und SSH sind nicht nötig, nur der **Container Manager** (Paketzentrum).
+
+1. **File Station:** Ordner `docker/uelights` anlegen (liegt dann unter `/volume1/docker/uelights`).
+2. **Systemsteuerung → Aufgabenplaner → Erstellen → Geplante Aufgabe → Benutzerdefiniertes Skript**
+   - *Allgemein:* Name `ueLights Update`, Benutzer **root**
+   - *Zeitplan:* täglich, z. B. 05:00 Uhr (oder stündlich, ein Lauf ohne neue Version dauert nur eine Sekunde)
+   - *Aufgabeneinstellungen:* „Ausführungsdetails per E-Mail senden“ und „nur wenn das Skript abnormal beendet wird“ aktivieren
+   - *Benutzerdefiniertes Skript:*
+     ```bash
+     BASE=/volume1/docker/uelights
+     mkdir -p "$BASE"
+     [ -f "$BASE/uelights-update.sh" ] || curl -fsSL https://raw.githubusercontent.com/Intracy/ueLights/main/nas/uelights-update.sh -o "$BASE/uelights-update.sh"
+     bash "$BASE/uelights-update.sh"
+     ```
+3. Aufgabe markieren → **Ausführen**. Der erste Lauf baut das Image (je nach NAS 3 bis 10 Minuten), danach läuft ueLights unter `http://<NAS-IP>:8787` und startet mit dem NAS automatisch.
+
+Was das Skript bei jedem Lauf macht:
+
+- Es fragt bei GitHub den neuesten Stand von `main` ab. Ist nichts neu und der Container läuft, endet es sofort.
+- Gibt es etwas Neues, lädt es den Quellcode, baut das Image und startet den Container neu. Läuft danach nach 90 Sekunden kein Health-Check durch, **stellt es automatisch die vorige Version** samt Einstellungen wieder her und meldet sich per E-Mail. Ein fehlgeschlagener Build lässt die laufende Version unangetastet.
+- Läuft der Container nicht (z. B. von Hand gestoppt), startet es ihn wieder.
+- Das Skript aktualisiert sich selbst mit.
+
+Im Ordner liegen danach `data/` (Einstellungen, bleibt immer erhalten), `.env` (Port und optionale Tokens), `docker-compose.yml`, `app/` (aktuelle Version) und `logs/update.log`. Der Container erscheint im Container Manager als Projekt **uelights**. Sofort aktualisieren: Aufgabe ausführen. Neu bauen erzwingen: im Skript `bash "$BASE/uelights-update.sh" --force`.
+
+Hinweis: Das Skript lädt als root Code aus diesem Repository. Wer Updates lieber selbst freigibt, stellt die Aufgabe auf „deaktiviert“ und führt sie nur bei Bedarf von Hand aus.
 </details>
 
 <details>
