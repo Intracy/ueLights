@@ -40,11 +40,12 @@ export const EVENT_AMOUNT_UNIT: Partial<Record<EventType, string>> = {
   giftSub: 'Subs',
   raid: 'Zuschauer',
   subscriber: 'Monate',
+  channelPoints: 'Punkte',
 };
 
 export interface NormalizedEvent {
   id: string;
-  source: 'streamelements' | 'test' | 'manual';
+  source: 'streamelements' | 'twitch' | 'test' | 'manual';
   type: EventType;
   /** Original-Typ der Quelle, z. B. "communityGiftPurchase" */
   rawType: string;
@@ -283,6 +284,20 @@ export interface Settings {
     presetCommand: string;
     sceneCommand: string;
   };
+  twitch: {
+    enabled: boolean;
+    /** Client-ID einer eigenen Twitch-App (Typ „Öffentlich“) */
+    clientId: string;
+    accessToken: string;
+    refreshToken: string;
+    /** Ablauf des Access-Tokens (ms seit 1970) */
+    expiresAt: number;
+    userId: string;
+    login: string;
+    scopes: string[];
+    /** Welche Events direkt von Twitch kommen */
+    events: { channelPoints: boolean; cheer: boolean; follow: boolean; subs: boolean; raid: boolean };
+  };
   hue: {
     enabled: boolean;
     bridgeIp: string;
@@ -332,6 +347,17 @@ export const DEFAULT_SETTINGS: Settings = {
     intensityScale: 1000,
     presetCommand: 'set_preset',
     sceneCommand: 'set_scene',
+  },
+  twitch: {
+    enabled: false,
+    clientId: '',
+    accessToken: '',
+    refreshToken: '',
+    expiresAt: 0,
+    userId: '',
+    login: '',
+    scopes: [],
+    events: { channelPoints: true, cheer: true, follow: true, subs: true, raid: true },
   },
   hue: { enabled: false, bridgeIp: '', appKey: '', clientKey: '', certFingerprint: '' },
   safety: {

@@ -3,7 +3,15 @@ import type { Alert, Effect, EventLogEntry, Group, Light, LiveMessage, LiveState
 import { api } from './api';
 
 export type PublicSettings = Settings & {
-  meta: { jwtFromEnv: boolean; haTokenFromEnv: boolean; amaranKeyFromEnv?: boolean; passwordFromEnv: boolean; detectedChannelId: string | null };
+  meta: {
+    jwtFromEnv: boolean;
+    haTokenFromEnv: boolean;
+    amaranKeyFromEnv?: boolean;
+    passwordFromEnv: boolean;
+    detectedChannelId: string | null;
+    twitchLogin?: { userCode: string; verificationUri: string; expiresAt: number } | null;
+    twitchError?: string | null;
+  };
 };
 
 interface Bootstrap {

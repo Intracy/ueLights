@@ -37,7 +37,53 @@ function blankAlert(): Alert {
   };
 }
 
-const AMOUNT_TYPES: EventType[] = ['tip', 'cheer', 'giftSub', 'raid', 'subscriber', 'superchat'];
+const AMOUNT_TYPES: EventType[] = ['tip', 'cheer', 'giftSub', 'raid', 'subscriber', 'superchat', 'channelPoints'];
+
+/** Kanalpunkte-Belohnung wählen: Liste von Twitch (wenn angemeldet) oder Name frei eingeben */
+function RewardPicker({ value, onChange }: { value?: string; onChange: (reward: string | undefined, cost?: number) => void }) {
+  const { settings } = useData();
+  const [rewards, setRewards] = useState<Array<{ id: string; title: string; cost: number; enabled: boolean }> | null>(null);
+  const [err, setErr] = useState('');
+  const connected = !!settings.twitch?.accessToken;
+  useEffect(() => {
+    if (!connected) return;
+    api
+      .get<Array<{ id: string; title: string; cost: number; enabled: boolean }>>('/api/twitch/rewards')
+      .then(setRewards)
+      .catch((e) => setErr((e as Error).message));
+  }, [connected]);
+
+  return (
+    <Field
+      label="Belohnung"
+      hint={
+        rewards
+          ? 'Leer = jede Belohnung. Für „ab X Punkte“ oben Stufen nach Betrag verwenden.'
+          : err || 'Genau wie in Twitch, Groß-/Kleinschreibung egal. Leer = jede Belohnung. Mit Twitch-Anmeldung gibt es hier eine Auswahlliste.'
+      }
+    >
+      {rewards ? (
+        <select
+          value={value ?? ''}
+          onChange={(e) => {
+            const r = rewards.find((x) => x.title === e.target.value);
+            onChange(e.target.value || undefined, r?.cost);
+          }}
+        >
+          <option value="">jede Belohnung</option>
+          {value && !rewards.some((r) => r.title === value) && <option value={value}>{value} (nicht mehr auf Twitch)</option>}
+          {rewards.map((r) => (
+            <option key={r.id} value={r.title}>
+              {r.title} · {r.cost.toLocaleString('de-DE')} Punkte{r.enabled ? '' : ' (deaktiviert)'}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input value={value ?? ''} onChange={(e) => onChange(e.target.value || undefined)} />
+      )}
+    </Field>
+  );
+}
 
 export function AmountEditor({ value, onChange, unit }: { value: AmountCondition; onChange: (v: AmountCondition) => void; unit: string }) {
   return (
@@ -236,9 +282,19 @@ export function AlertBuilder({ id }: { id: string }) {
                 <AmountEditor value={draft.conditions.amount} unit={unit} onChange={(amount) => update({ conditions: { ...draft.conditions, amount } })} />
               )}
               {draft.trigger === 'channelPoints' && (
-                <Field label="Name der Belohnung" hint="Genau wie in Twitch, Groß-/Kleinschreibung egal. Leer = jede Belohnung.">
-                  <input value={draft.conditions.reward ?? ''} onChange={(e) => update({ conditions: { ...draft.conditions, reward: e.target.value || undefined } })} />
-                </Field>
+                <RewardPicker
+                  value={draft.conditions.reward}
+                  onChange={(reward, cost) =>
+                    update({
+                      conditions: {
+                        ...draft.conditions,
+                        reward,
+                        // Bei Auswahl einer Belohnung ohne Betragsbedingung nichts erzwingen
+                        amount: cost !== undefined && draft.conditions.amount.mode !== 'any' ? { mode: 'exact', value: cost } : draft.conditions.amount,
+                      },
+                    })
+                  }
+                />
               )}
               <Field label="Nachricht enthält (optional)" hint={draft.trigger === 'chatMessage' ? 'z. B. „!farbe“ für einen Chat-Befehl' : undefined}>
                 <input value={draft.conditions.textContains ?? ''} onChange={(e) => update({ conditions: { ...draft.conditions, textContains: e.target.value || undefined } })} />

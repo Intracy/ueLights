@@ -84,6 +84,18 @@ export function SettingsPage() {
             <Switch checked={s.streamelements.topics.tips} onChange={(v) => up('streamelements', { topics: { ...s.streamelements.topics, tips: v } })} label="Zusätzlich channel.tips (Duplikate werden gefiltert)" />
           </section>
 
+          <TwitchSection
+            tw={s.twitch}
+            loggedIn={!!settings.twitch.accessToken}
+            login={settings.twitch.login}
+            pending={settings.meta.twitchLogin ?? null}
+            error={settings.meta.twitchError ?? null}
+            status={conn('twitch')}
+            onChange={(v) => up('twitch', v)}
+            onSave={doSave}
+            dirty={dirty}
+          />
+
           <section className="card">
             <h2>Auslösung</h2>
             <Segmented
@@ -323,6 +335,109 @@ function StatusText({ state, detail }: { state?: string; detail?: string }) {
       {state === 'ok' ? 'verbunden' : state === 'error' ? 'Fehler' : 'verbindet …'}
       {detail && <span className="muted mono" style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{detail}</span>}
     </span>
+  );
+}
+
+function TwitchSection({
+  tw,
+  loggedIn,
+  login,
+  pending,
+  error,
+  status,
+  onChange,
+  onSave,
+  dirty,
+}: {
+  tw: Settings['twitch'];
+  loggedIn: boolean;
+  login: string;
+  pending: { userCode: string; verificationUri: string; expiresAt: number } | null;
+  error: string | null;
+  status?: { state: string; detail?: string };
+  onChange: (v: Partial<Settings['twitch']>) => void;
+  onSave: () => Promise<unknown>;
+  dirty: boolean;
+}) {
+  const { run, reload } = useData();
+  // Während der Anmeldung den Stand regelmäßig holen
+  useEffect(() => {
+    if (!pending) return;
+    const t = setInterval(() => reload().catch(() => undefined), 3000);
+    return () => clearInterval(t);
+  }, [pending, reload]);
+
+  const start = async () => {
+    if (dirty) await onSave();
+    const r = await run(() => api.post<{ userCode: string; verificationUri: string }>('/api/twitch/login'));
+    if (r) {
+      window.open(r.verificationUri, '_blank', 'noopener');
+      await reload();
+    }
+  };
+  const ev = tw.events;
+  const setEv = (k: keyof Settings['twitch']['events'], v: boolean) => onChange({ events: { ...ev, [k]: v } });
+
+  return (
+    <section className="card">
+      <div className="row">
+        <h2 className="grow">Twitch</h2>
+        <StatusText state={status?.state as never} detail={status?.detail} />
+      </div>
+      <Switch checked={tw.enabled} onChange={(v) => onChange({ enabled: v })} label="Events direkt von Twitch empfangen" />
+      <Field
+        label="Client-ID"
+        hint="dev.twitch.tv/console → Anwendung registrieren, Client-Typ „Öffentlich“, OAuth-Redirect „http://localhost“. Ein Client-Secret ist nicht nötig."
+      >
+        <input value={tw.clientId} onChange={(e) => onChange({ clientId: e.target.value.trim() })} placeholder="abc123…" />
+      </Field>
+
+      {pending ? (
+        <div className="card" style={{ background: 'var(--surface)', gap: 8 }}>
+          <span className="small">
+            Auf <a href={pending.verificationUri} target="_blank" rel="noreferrer">twitch.tv/activate</a> diesen Code eingeben und bestätigen:
+          </span>
+          <span className="mono" style={{ fontSize: 28, letterSpacing: 4 }}>{pending.userCode}</span>
+          <div className="row" style={{ gap: 8 }}>
+            <span className="small muted grow">Wartet auf Bestätigung …</span>
+            <button className="btn text" onClick={() => run(() => api.post('/api/twitch/login/cancel')).then(() => reload())}>
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          {loggedIn ? (
+            <>
+              <span className="grow small">
+                Angemeldet als <b>{login}</b>
+              </span>
+              <button className="btn text" onClick={() => run(() => api.post('/api/twitch/logout'), 'Von Twitch abgemeldet').then(() => reload())}>
+                Abmelden
+              </button>
+              <button className="btn tonal" onClick={start}>
+                <Icon name="refresh" />
+                Neu anmelden
+              </button>
+            </>
+          ) : (
+            <button className="btn" onClick={start} disabled={!tw.clientId}>
+              <Icon name="login" />
+              Mit Twitch anmelden
+            </button>
+          )}
+        </div>
+      )}
+      {error && <span className="small" style={{ color: 'var(--error)' }}>{error}</span>}
+
+      <span className="label">Events von Twitch</span>
+      <Switch checked={ev.channelPoints} onChange={(v) => setEv('channelPoints', v)} label="Kanalpunkte (Belohnung, Kosten, Text)" />
+      <Switch checked={ev.cheer} onChange={(v) => setEv('cheer', v)} label="Bits" />
+      <Switch checked={ev.subs} onChange={(v) => setEv('subs', v)} label="Subs, Resubs und Gift-Subs" />
+      <Switch checked={ev.follow} onChange={(v) => setEv('follow', v)} label="Follows" />
+      <Switch checked={ev.raid} onChange={(v) => setEv('raid', v)} label="Raids" />
+      <span className="small muted">Kommt dasselbe Event auch über StreamElements, löst es trotzdem nur einmal aus.</span>
+    </section>
   );
 }
 

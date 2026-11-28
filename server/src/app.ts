@@ -29,6 +29,7 @@ import { AlertEngine } from './engine/engine.js';
 import { Player } from './engine/player.js';
 import { EventPipeline } from './events/pipeline.js';
 import { channelIdFromJwt, StreamElementsSource } from './sources/streamelements.js';
+import { TwitchAuth, TwitchSource } from './sources/twitch.js';
 import { Store } from './store.js';
 
 const COOKIE = 'uelights_session';
@@ -103,9 +104,31 @@ export async function buildApp() {
     pushState,
     app.log,
   );
+  const twitchAuth = new TwitchAuth(
+    () => S().twitch,
+    (patch) => {
+      S().twitch = { ...S().twitch, ...patch };
+      store.commit();
+    },
+    () => {
+      pushState();
+      // Nach erfolgreicher Anmeldung sofort verbinden
+      if (S().twitch.accessToken && twitch.status.state !== 'ok' && twitch.status.state !== 'connecting') twitch.restart();
+    },
+  );
+  const twitch = new TwitchSource(
+    () => S().twitch,
+    twitchAuth,
+    (res) => {
+      const { event, drop } = pipeline.process(res);
+      engine.handle(event, drop);
+    },
+    pushState,
+    app.log,
+  );
 
   function liveState(): LiveState {
-    const conns = [se.status, registry.ha.status, registry.amaran.status, registry.hue.status];
+    const conns = [se.status, twitch.status, registry.ha.status, registry.amaran.status, registry.hue.status];
     if (store.data.lights.some((l) => l.connector === 'govee')) {
       conns.push({
         id: 'govee',
@@ -126,6 +149,7 @@ export async function buildApp() {
 
   const restartConnections = () => {
     se.restart();
+    twitch.restart();
     registry.ha.restart();
     registry.amaran.restart();
     registry.hue.restart();
@@ -191,6 +215,8 @@ export async function buildApp() {
     s.homeassistant.token = mask(s.homeassistant.token);
     s.amaran.apiKey = mask(s.amaran.apiKey);
     s.hue.appKey = mask(s.hue.appKey);
+    s.twitch.accessToken = s.twitch.accessToken ? MASK : '';
+    s.twitch.refreshToken = s.twitch.refreshToken ? MASK : '';
     s.hue.clientKey = mask(s.hue.clientKey);
     return {
       ...s,
@@ -198,6 +224,10 @@ export async function buildApp() {
         jwtFromEnv: !!config.seJwt,
         haTokenFromEnv: !!config.haToken,
         amaranKeyFromEnv: !!config.amaranKey,
+        twitchLogin: twitchAuth.pending
+          ? { userCode: twitchAuth.pending.userCode, verificationUri: twitchAuth.pending.verificationUri, expiresAt: twitchAuth.pending.expiresAt }
+          : null,
+        twitchError: twitchAuth.lastError || null,
         passwordFromEnv: !!config.password,
         detectedChannelId: jwt ? channelIdFromJwt(jwt) ?? null : null,
       },
@@ -222,6 +252,12 @@ export async function buildApp() {
     if (!next.homeassistant.token || next.homeassistant.token.startsWith(MASK)) next.homeassistant.token = cur.homeassistant.token;
     if (next.amaran.apiKey === undefined || next.amaran.apiKey.startsWith(MASK)) next.amaran.apiKey = cur.amaran.apiKey;
     if (next.amaran?.url) next.amaran.url = normalizeWsUrl(next.amaran.url);
+    // Twitch-Anmeldung setzt nur der Login-Ablauf; eine neue Client-ID meldet ab
+    {
+      const t = cur.twitch;
+      next.twitch = { ...t, ...(next.twitch ?? {}), accessToken: t.accessToken, refreshToken: t.refreshToken, expiresAt: t.expiresAt, userId: t.userId, login: t.login, scopes: t.scopes };
+      if (next.twitch.clientId !== t.clientId) next.twitch = { ...next.twitch, accessToken: '', refreshToken: '', userId: '', login: '', scopes: [], expiresAt: 0 };
+    }
     // Hue-Schlüssel und Zertifikat setzt nur das Koppeln
     next.hue = { ...cur.hue, ...(next.hue ?? {}), appKey: cur.hue.appKey, clientKey: cur.hue.clientKey, certFingerprint: cur.hue.certFingerprint };
     if (next.hue.bridgeIp !== cur.hue.bridgeIp) next.hue = { ...next.hue, appKey: '', clientKey: '', certFingerprint: '' };
@@ -230,8 +266,8 @@ export async function buildApp() {
     next.safety = { ...next.safety, paused: cur.safety.paused };
     if (next.triggerMode !== 'auto' && next.triggerMode !== 'manual') next.triggerMode = cur.triggerMode;
     const reconnect =
-      JSON.stringify([cur.streamelements, cur.homeassistant, cur.amaran, cur.hue]) !==
-      JSON.stringify([next.streamelements, next.homeassistant, next.amaran, next.hue]);
+      JSON.stringify([cur.streamelements, cur.homeassistant, cur.amaran, cur.hue, cur.twitch]) !==
+      JSON.stringify([next.streamelements, next.homeassistant, next.amaran, next.hue, next.twitch]);
     store.data.settings = next;
     store.commit();
     if (reconnect) restartConnections();
@@ -454,6 +490,33 @@ export async function buildApp() {
     if (registry.ha.status.state !== 'ok') return fail(reply, 503, 'Home Assistant ist nicht verbunden');
     return registry.ha.entities();
   });
+  // Twitch
+  app.post('/api/twitch/login', async (_req, reply) => {
+    try {
+      return await twitchAuth.startDeviceLogin();
+    } catch (err) {
+      return fail(reply, 400, (err as Error).message);
+    }
+  });
+  app.post('/api/twitch/login/cancel', async () => {
+    twitchAuth.cancel();
+    pushState();
+    return { ok: true };
+  });
+  app.post('/api/twitch/logout', async () => {
+    twitch.stop();
+    twitchAuth.logout();
+    twitch.restart();
+    return { ok: true };
+  });
+  app.get('/api/twitch/rewards', async (_req, reply) => {
+    try {
+      return await twitch.rewards();
+    } catch (err) {
+      return fail(reply, 503, (err as Error).message);
+    }
+  });
+
   // Philips Hue
   app.get('/api/hue/bridges', async () => discoverHueBridges());
   app.post<{ Body: { ip: string } }>('/api/hue/pair', async (req, reply) => {
@@ -539,6 +602,7 @@ export async function buildApp() {
     const { token: _tok, ...haRest } = s.homeassistant;
     const { apiKey: _ak, ...amRest } = s.amaran;
     const { appKey: _hk, clientKey: _hc, certFingerprint: _hf, ...hueRest } = s.hue;
+    const { accessToken: _ta, refreshToken: _tr, expiresAt: _te, userId: _tu, login: _tl, scopes: _ts, ...twRest } = s.twitch;
     const backup: Backup = {
       version: 1,
       exportedAt: new Date().toISOString(),
@@ -546,7 +610,7 @@ export async function buildApp() {
       effects: store.data.effects,
       lights: store.data.lights,
       groups: store.data.groups,
-      settings: { ...s, streamelements: seRest, homeassistant: haRest, amaran: amRest as Settings['amaran'], hue: hueRest as Settings['hue'] },
+      settings: { ...s, streamelements: seRest, homeassistant: haRest, amaran: amRest as Settings['amaran'], hue: hueRest as Settings['hue'], twitch: twRest as Settings['twitch'] },
     };
     reply.header('Content-Disposition', `attachment; filename="uelights-backup-${new Date().toISOString().slice(0, 10)}.json"`);
     return backup;
@@ -566,6 +630,7 @@ export async function buildApp() {
         homeassistant: { ...b.settings.homeassistant, token: cur.homeassistant.token },
         amaran: { ...cur.amaran, ...b.settings.amaran, apiKey: cur.amaran.apiKey },
         hue: { ...cur.hue, ...(b.settings.hue ?? {}), appKey: cur.hue.appKey, clientKey: cur.hue.clientKey, certFingerprint: cur.hue.certFingerprint },
+        twitch: { ...cur.twitch, ...(b.settings.twitch ?? {}), accessToken: cur.twitch.accessToken, refreshToken: cur.twitch.refreshToken, expiresAt: cur.twitch.expiresAt, userId: cur.twitch.userId, login: cur.twitch.login, scopes: cur.twitch.scopes },
       };
     }
     store.commit();
@@ -607,6 +672,7 @@ export async function buildApp() {
   });
   app.addHook('onClose', async () => {
     se.stop();
+    twitch.stop();
     registry.stopAll();
     store.flush();
     for (const c of clients) c.close();

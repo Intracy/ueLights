@@ -195,6 +195,16 @@ Snapshots aus der Govee-App liegen nur in Govees Cloud und sind lokal nicht erre
 </details>
 
 <details>
+<summary><b>Twitch</b>: Kanalpunkte, Bits, Subs, Follows und Raids direkt von Twitch</summary>
+
+- **Eigene Twitch-App anlegen** (einmalig): [dev.twitch.tv/console](https://dev.twitch.tv/console) → *Anwendung registrieren* → Name frei wählbar, OAuth-Redirect `http://localhost`, Kategorie z. B. „Broadcaster Suite“, **Client-Typ „Öffentlich“**. Die angezeigte **Client-ID** kopieren. Ein Client-Secret ist nicht nötig.
+- **Einstellungen → Twitch:** Client-ID eintragen, **Mit Twitch anmelden**. ueLights zeigt einen Code und öffnet twitch.tv/activate; dort den Code eingeben und bestätigen. Funktioniert ohne HTTPS und ohne Weiterleitungs-Adresse, also auch auf dem NAS.
+- Die Events kommen per **Twitch EventSub WebSocket** (ausgehende Verbindung, keine Portfreigabe). Das Token wird automatisch erneuert; nach 30 Tagen ohne Nutzung ist eine neue Anmeldung nötig.
+- **Kanalpunkte:** Im Alert-Builder unter *Kanalpunkte* erscheinen alle Belohnungen des Kanals mit ihren Kosten. Ein Alert kann auf eine bestimmte Belohnung reagieren oder über **Stufen nach Betrag** auf die Kosten, z. B. „ab 5.000 Punkte → Disco“.
+- Läuft StreamElements parallel, löst dasselbe Event (gleicher Typ, Nutzer, Betrag/Belohnung innerhalb von 15 s) nur einmal aus.
+</details>
+
+<details>
 <summary><b>Philips Hue</b>: lokal über die Hue Bridge</summary>
 
 - **Einstellungen → Philips Hue → Suchen** findet die Bridge im Netz (SSDP/mDNS, ohne Hue-Cloud). Alternativ die IP aus der Hue-App eintragen.
