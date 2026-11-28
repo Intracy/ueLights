@@ -66,6 +66,8 @@ docker compose up -d --build
 
 Node.js ist eingebaut, eine Installation ist nicht nötig. Der Browser öffnet sich automatisch. Alternativ: `ueLights-starten.bat` aus dem Repo.
 
+**🍎 Mac:** Repo laden, `ueLights-starten.command` doppelklicken.
+
 </td>
 <td width="33%" valign="top">
 
@@ -100,7 +102,7 @@ Beim ersten Öffnen legst du ein Passwort fest. Danach in **Einstellungen → St
 | **💡 Lichter** | Twinkly (Echtzeit pro LED), Govee LAN, amaran Desktop, Home Assistant, Webhook, **virtuelle Lichter** zum Testen. Gerätesuche im Netz, Gruppen über Hersteller hinweg, Ruhezustand je Licht (wie vorher / aus / Farbe / Hersteller-Effekt). |
 | **🛡️ Sicherheit** | Flacker-Schutz (Standard: max. 3 Blitze/s), Bildlicht-Sperre, Ruhezeiten, Pause, Alles stoppen, Verwerfen alter Events nach einem Reconnect, Limit für die Warteschlange, Login mit Passwort |
 | **📡 Live** | Feed mit Status je Event, Anzeige „läuft gerade“ mit Fortschritt, Warteschlange, erneut abspielen, Testevents mit einem Klick, virtuelle LED-Streifen |
-| **🧰 Betrieb** | Docker/Compose, Windows-Skripte mit Autostart und Update, PWA fürs iPad/iPhone, Backup/Import als JSON (ohne Geheimnisse), CI mit Tests |
+| **🧰 Betrieb** | Docker/Compose, Windows- und Mac-Skripte mit Autostart und Update, PWA fürs iPad/iPhone, Backup/Import als JSON (ohne Geheimnisse), CI mit Tests |
 
 ## 📸 Screenshots
 
@@ -141,7 +143,7 @@ Beim ersten Öffnen legst du ein Passwort fest. Danach in **Einstellungen → St
 ```mermaid
 flowchart LR
   SE["StreamElements<br/>Astro WebSocket"] -- "Spenden · Bits · Subs<br/>Raids · Kanalpunkte · Chat" --> N
-  subgraph S["ueLights-Server · Docker / Windows"]
+  subgraph S["ueLights-Server · Docker / Windows / Mac"]
     N["Normalisieren<br/>Duplikate · Gift-Bomben<br/>Währung"] --> E["Alert-Engine<br/>Stufen · Priorität · Cooldown<br/>Automatisch / Manuell"]
     E --> Q["Warteschlange"] --> P["Player<br/>Effekt-Renderer<br/>Flacker-Schutz"]
   end
@@ -259,6 +261,26 @@ Alternativ die Skripte im Repo (Node.js wird bei Bedarf über winget installiert
 | `windows\update.ps1` | `git pull`, neu bauen, Autostart neu starten |
 
 Daten liegen in `%LOCALAPPDATA%\ueLights`, Logs unter `…\ueLights\logs\uelights.log`.
+</details>
+
+<details>
+<summary><b>macOS</b></summary>
+
+```bash
+git clone https://github.com/Intracy/ueLights.git && cd ueLights
+./ueLights-starten.command
+```
+
+Oder im Finder **`ueLights-starten.command`** doppelklicken. Das Skript prüft Node.js (bietet bei Bedarf die Installation über Homebrew an, sonst den Installer von nodejs.org), installiert die Abhängigkeiten, baut beim ersten Start und nach Änderungen und öffnet den Browser. Läuft ueLights schon, öffnet ein weiterer Doppelklick nur den Browser. Beim ersten Gerätesuchen fragt macOS nach dem **Zugriff auf Geräte im lokalen Netzwerk**: erlauben, sonst findet ueLights Twinkly und Govee nicht (nachträglich unter *Systemeinstellungen → Datenschutz & Sicherheit → Lokales Netzwerk*). Als ZIP geladen meldet macOS evtl. „nicht verifizierter Entwickler“: Rechtsklick → *Öffnen* oder `bash ueLights-starten.command` im Terminal.
+
+| Skript | Zweck |
+| --- | --- |
+| `ueLights-starten.command` | Start im Terminal-Fenster (`--port 8788`, `--rebuild`, `--no-browser`) |
+| `mac/autostart-einrichten.sh` | Start bei der Anmeldung im Hintergrund (LaunchAgent, Neustart nach Absturz) |
+| `mac/autostart-entfernen.sh` | Autostart entfernen, Hintergrund-Server beenden |
+| `mac/update.sh` | `git pull`, neu bauen, Autostart neu starten |
+
+Daten liegen in `~/Library/Application Support/ueLights`, Logs unter `~/Library/Logs/ueLights/`. Die amaran-Desktop-App läuft auf demselben Mac: `ws://localhost:33782/ws`.
 </details>
 
 <details>
