@@ -60,3 +60,28 @@ export async function fetchJson(
     clearTimeout(t);
   }
 }
+
+/** JSON lesen und nur Objekte zurückgeben (null, Zahlen, Text und Arrays ergeben null) */
+export function parseObject(text: string): Record<string, unknown> | null {
+  try {
+    const v = JSON.parse(text);
+    return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** amaran-Adresse vervollständigen: „192.168.0.25:33783“ → „ws://192.168.0.25:33783/ws“ */
+export function normalizeWsUrl(raw: string, defaultPort = 33782): string {
+  let u = raw.trim();
+  if (!u) return u;
+  if (!/^wss?:\/\//i.test(u)) u = `ws://${u.replace(/^https?:\/\//i, '')}`;
+  try {
+    const url = new URL(u);
+    if (!url.port && !/^wss:/i.test(u)) url.port = String(defaultPort);
+    if (url.pathname === '/' || url.pathname === '') url.pathname = '/ws';
+    return url.toString();
+  } catch {
+    return u;
+  }
+}

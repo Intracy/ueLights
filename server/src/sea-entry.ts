@@ -92,9 +92,13 @@ async function main(): Promise<void> {
   // Erst jetzt laden, damit die Konfiguration die Umgebungsvariablen sieht
   const { buildApp } = await import('./app.js');
   const { config } = await import('./config.js');
+  // Ein einzelner Fehler (z. B. eine unerwartete Nachricht eines Geräts) darf den Server nicht beenden
+  process.on('uncaughtException', (err) => console.error('Unerwarteter Fehler (ueLights läuft weiter):', err));
+  process.on('unhandledRejection', (err) => console.error('Unbehandelter Fehler (ueLights läuft weiter):', err));
   const app = await buildApp();
   const shutdown = async () => {
-    await app.close();
+    setTimeout(() => process.exit(0), 3000).unref();
+    await app.close().catch(() => undefined);
     process.exit(0);
   };
   process.on('SIGINT', shutdown);

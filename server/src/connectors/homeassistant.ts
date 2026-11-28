@@ -1,6 +1,6 @@
 import WebSocket from 'ws';
 import type { ConnectionStatus, Light, NativeEffect, Rgb, Settings } from '@uelights/shared';
-import { DriverError, type DriverCapabilities, type LightDriver } from './types.js';
+import { DriverError, parseObject, type DriverCapabilities, type LightDriver } from './types.js';
 
 export interface HaState {
   entity_id: string;
@@ -55,15 +55,16 @@ export class HomeAssistantClient {
   private connect(): void {
     const s = this.getSettings();
     this.setStatus('connecting', s.url);
-    const ws = new WebSocket(this.wsUrl());
+    let ws: WebSocket;
+    try {
+      ws = new WebSocket(this.wsUrl(), { handshakeTimeout: 5000 });
+    } catch (err) {
+      return this.setStatus('error', `Ungültige Adresse: ${(err as Error).message}`);
+    }
     this.ws = ws;
     ws.on('message', async (buf) => {
-      let msg: Record<string, unknown>;
-      try {
-        msg = JSON.parse(buf.toString());
-      } catch {
-        return;
-      }
+      const msg = parseObject(buf.toString());
+      if (!msg) return;
       if (msg.type === 'auth_required') {
         ws.send(JSON.stringify({ type: 'auth', access_token: this.tokenOverride || s.token }));
       } else if (msg.type === 'auth_invalid') {

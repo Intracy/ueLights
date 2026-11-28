@@ -1,6 +1,6 @@
 import dgram from 'node:dgram';
 import type { Light, NativeEffect, Rgb } from '@uelights/shared';
-import { DriverError, type DriverCapabilities, type LightDriver } from './types.js';
+import { DriverError, type DriverCapabilities, type LightDriver, parseObject } from './types.js';
 
 const MULTICAST = '239.255.255.250';
 const SCAN_PORT = 4001;
@@ -58,12 +58,8 @@ export class GoveeLan {
       this.error = `UDP-Port ${LISTEN_PORT}: ${err.message}`;
     });
     sock.on('message', (buf, rinfo) => {
-      let msg: { msg?: { cmd?: string; data?: Record<string, unknown> } };
-      try {
-        msg = JSON.parse(buf.toString());
-      } catch {
-        return;
-      }
+      const msg = parseObject(buf.toString()) as { msg?: { cmd?: string; data?: Record<string, unknown> } } | null;
+      if (!msg || typeof msg.msg !== 'object' || msg.msg === null) return;
       const cmd = msg.msg?.cmd;
       const data = msg.msg?.data ?? {};
       if (cmd === 'scan') {

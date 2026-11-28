@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import WebSocket from 'ws';
 import type { ConnectionStatus, Settings } from '@uelights/shared';
+import { parseObject } from '../connectors/types.js';
 import { normalizeActivity, normalizeChat, normalizeTip, type NormalizeResult } from '../events/normalize.js';
 
 const ASTRO_URL = 'wss://astro.streamelements.com';
@@ -98,12 +99,8 @@ export class StreamElementsSource {
     });
 
     ws.on('message', (buf) => {
-      let msg: Record<string, unknown>;
-      try {
-        msg = JSON.parse(buf.toString());
-      } catch {
-        return;
-      }
+      const msg = parseObject(buf.toString());
+      if (!msg) return;
       if (msg.type === 'response' && msg.error) {
         this.log.warn(msg, 'StreamElements-Fehler');
         this.setStatus('error', String(msg.error));

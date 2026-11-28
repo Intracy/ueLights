@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import WebSocket from 'ws';
 import { rgbToHsv, type ConnectionStatus, type Light, type NativeEffect, type Rgb, type Settings } from '@uelights/shared';
-import { DriverError, type DriverCapabilities, type LightDriver } from './types.js';
+import { DriverError, normalizeWsUrl, parseObject, type DriverCapabilities, type LightDriver } from './types.js';
 
 interface Waiter {
   action: string;
@@ -65,7 +65,7 @@ export class AmaranClient {
   }
 
   private okDetail(): string {
-    return `${this.getSettings().url} · Protokoll v${this.protocol}${this.apiKey ? ' · mit API-Key' : ''}`;
+    return `${normalizeWsUrl(this.getSettings().url)} · Protokoll v${this.protocol}${this.apiKey ? ' · mit API-Key' : ''}`;
   }
 
   restart(): void {
@@ -98,7 +98,12 @@ export class AmaranClient {
     const s = this.getSettings();
     this.setStatus('connecting', s.url);
     this.protocol = 2;
-    const ws = new WebSocket(s.url);
+    let ws: WebSocket;
+    try {
+      ws = new WebSocket(normalizeWsUrl(s.url), { handshakeTimeout: 5000 });
+    } catch (err) {
+      return this.setStatus('error', `Ungültige Adresse: ${(err as Error).message}`);
+    }
     this.ws = ws;
     ws.on('open', async () => {
       this.setStatus('ok', this.okDetail());
@@ -115,7 +120,13 @@ export class AmaranClient {
       }
       this.setStatus('ok', this.okDetail());
     });
-    ws.on('message', (buf) => this.onMessage(buf.toString()));
+    ws.on('message', (buf) => {
+      try {
+        this.onMessage(buf.toString());
+      } catch {
+        /* unerwartete Nachricht der Desktop-App ignorieren */
+      }
+    });
     ws.on('close', () => {
       this.rejectAll('amaran getrennt');
       if (this.stopped) return;
@@ -126,12 +137,8 @@ export class AmaranClient {
   }
 
   private onMessage(raw: string): void {
-    let msg: Record<string, unknown>;
-    try {
-      msg = JSON.parse(raw);
-    } catch {
-      return;
-    }
+    const msg = parseObject(raw);
+    if (!msg) return;
     if (typeof msg.version === 'number' && msg.version < 2 && this.protocol >= 2) {
       this.protocol = msg.version;
       this.setStatus('ok', this.okDetail());

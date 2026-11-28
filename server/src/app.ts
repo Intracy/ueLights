@@ -24,6 +24,7 @@ import { parseSceneCatalog } from './connectors/govee.js';
 import { DriverRegistry } from './connectors/registry.js';
 import { discoverTwinkly } from './connectors/twinkly.js';
 import { discoverHueBridges, pairHueBridge } from './connectors/hue.js';
+import { normalizeWsUrl } from './connectors/types.js';
 import { AlertEngine } from './engine/engine.js';
 import { Player } from './engine/player.js';
 import { EventPipeline } from './events/pipeline.js';
@@ -220,6 +221,7 @@ export async function buildApp() {
     if (!next.streamelements.jwt || next.streamelements.jwt.startsWith(MASK)) next.streamelements.jwt = cur.streamelements.jwt;
     if (!next.homeassistant.token || next.homeassistant.token.startsWith(MASK)) next.homeassistant.token = cur.homeassistant.token;
     if (next.amaran.apiKey === undefined || next.amaran.apiKey.startsWith(MASK)) next.amaran.apiKey = cur.amaran.apiKey;
+    if (next.amaran?.url) next.amaran.url = normalizeWsUrl(next.amaran.url);
     // Hue-Schlüssel und Zertifikat setzt nur das Koppeln
     next.hue = { ...cur.hue, ...(next.hue ?? {}), appKey: cur.hue.appKey, clientKey: cur.hue.clientKey, certFingerprint: cur.hue.certFingerprint };
     if (next.hue.bridgeIp !== cur.hue.bridgeIp) next.hue = { ...next.hue, appKey: '', clientKey: '', certFingerprint: '' };

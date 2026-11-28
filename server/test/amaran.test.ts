@@ -102,3 +102,30 @@ describe('amaran Desktop', () => {
     c.stop();
   });
 });
+
+import { normalizeWsUrl } from '../src/connectors/types.js';
+
+describe('robust gegen Fehleingaben', () => {
+  it('vervollständigt die amaran-Adresse', () => {
+    expect(normalizeWsUrl('192.168.0.25:33783')).toBe('ws://192.168.0.25:33783/ws');
+    expect(normalizeWsUrl('192.168.0.25')).toBe('ws://192.168.0.25:33782/ws');
+    expect(normalizeWsUrl(' ws://192.168.0.25:33783/ws ')).toBe('ws://192.168.0.25:33783/ws');
+    expect(normalizeWsUrl('http://pc:33783')).toBe('ws://pc:33783/ws');
+  });
+
+  it('übersteht unerwartete Nachrichten der Desktop-App', async () => {
+    const wsMod = await import('ws');
+    const srv = new wsMod.WebSocketServer({ port: 0, host: '127.0.0.1' });
+    await new Promise((r) => srv.once('listening', r));
+    srv.on('connection', (ws) => {
+      for (const m of ['null', '42', '"x"', '[1]', '{"type":"event","data":null}']) ws.send(m);
+    });
+    const port = (srv.address() as { port: number }).port;
+    const c = new AmaranClient(() => ({ ...DEFAULT_SETTINGS.amaran, enabled: true, url: `127.0.0.1:${port}` }), () => undefined);
+    c.restart();
+    await new Promise((r) => setTimeout(r, 300));
+    expect(['ok', 'connecting']).toContain(c.status.state);
+    c.stop();
+    srv.close();
+  });
+});
