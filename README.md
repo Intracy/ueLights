@@ -212,6 +212,7 @@ Snapshots aus der Govee-App liegen nur in Govees Cloud und sind lokal nicht erre
 - **Einstellungen → amaran Desktop:** `ws://<Rechner-IP>:33782/ws` eintragen, aktivieren. Läuft ueLights unter Windows auf demselben PC, genügt `ws://localhost:33782/ws`.
 - **OpenAPI-Key** (amaran Desktop → Benutzerzentrum → OpenAPI beantragen) unter *Einstellungen → amaran Desktop* eintragen oder per `AMARAN_API_KEY` setzen. Der Key bleibt in ueLights; er signiert jede Anfrage über denselben lokalen WebSocket (AES-256-GCM-Token, Protokoll v2). Ältere Desktop-Versionen ohne Key-Prüfung werden automatisch erkannt.
 - **Lichter → amaran → Suchen** listet die Leuchten. Eingebaute Effekte, Presets, Quickshots und Szenen werden eingelesen.
+- **Bi-Color-Leuchten** (z. B. Halo 60x, Verge, COB 60x S) können keine Farben. ueLights erkennt sie am Modellnamen (oder an der Ablehnung eines Farbbefehls) und macht aus Farben Weißtöne: warme Farben → 2700 K, Weiß → 5600 K, kalte Farben → 6500 K. Helligkeit, Blitze und Pulse bleiben erhalten. Pro Licht unter *Farbfähigkeit* auch fest einstellbar.
 - Befehlsnamen für Presets und Szenen sowie die Intensitäts-Skala sind unter *Erweitert* einstellbar.
 - Leuchten, die im Bild ausleuchten, als **Bildlicht** markieren. Alerts schalten sie dann nie.
 </details>

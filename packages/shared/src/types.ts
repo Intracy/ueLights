@@ -164,6 +164,10 @@ export interface LightConfig {
   sku?: string;
   // amaran
   nodeId?: string;
+  /** Farbfähigkeit: auto (am Namen/an der Antwort erkennen), rgb (Vollfarbe) oder cct (Bi-Color, nur Weiß) */
+  amaranColor?: 'auto' | 'rgb' | 'cct';
+  /** Name des Geräts in der amaran-App (für die automatische Erkennung) */
+  deviceName?: string;
   // hue: Ressource auf der Bridge (Lampe oder Raum/Zone)
   hueId?: string;
   hueType?: 'light' | 'grouped_light';

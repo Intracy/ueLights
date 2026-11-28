@@ -129,3 +129,64 @@ describe('robust gegen Fehleingaben', () => {
     srv.close();
   });
 });
+
+import { AmaranDriver, guessAmaranColor, rgbToCct } from '../src/connectors/amaran.js';
+import type { Light } from '@uelights/shared';
+
+describe('Bi-Color-Leuchten', () => {
+  it('erkennt Vollfarbe und Bi-Color am Modellnamen', () => {
+    expect(guessAmaranColor('Pano 60C')).toBe('rgb');
+    expect(guessAmaranColor('amaran 150c')).toBe('rgb');
+    expect(guessAmaranColor('Halo 60x')).toBe('cct');
+    expect(guessAmaranColor('COB 60x S')).toBe('cct');
+    expect(guessAmaranColor('Verge Max')).toBe('cct');
+    expect(guessAmaranColor('Studio links')).toBe('unknown');
+  });
+
+  it('übersetzt Farben in Weißtöne', () => {
+    expect(rgbToCct({ r: 255, g: 255, b: 255 })).toBe(5600);
+    expect(rgbToCct({ r: 255, g: 80, b: 0 })).toBe(2700);
+    expect(rgbToCct({ r: 0, g: 0, b: 255 })).toBe(6500);
+    expect(rgbToCct({ r: 0, g: 255, b: 0 })).toBe(5600);
+  });
+
+  const fakeClient = (rejectHsi: boolean) => {
+    const calls: Array<{ action: string; args?: Record<string, unknown> }> = [];
+    const client = {
+      protocol: 2,
+      request: async (action: string, _node?: string, args?: Record<string, unknown>) => {
+        calls.push({ action, args });
+        if (action === 'set_hsi' && rejectHsi) throw new Error('amaran set_hsi: not supported');
+        return {};
+      },
+    };
+    return { client, calls };
+  };
+  const light = (name: string, amaranColor?: 'auto' | 'rgb' | 'cct') =>
+    ({ id: 'a', name, connector: 'amaran', config: { nodeId: 'N1', amaranColor }, role: 'deco', enabled: true, restState: { mode: 'snapshot' }, nativeEffects: [] }) as unknown as Light;
+  const settings = () => DEFAULT_SETTINGS.amaran;
+
+  it('schickt an Bi-Color-Leuchten Weißtöne statt Farbe', async () => {
+    const { client, calls } = fakeClient(false);
+    const d = new AmaranDriver(light('Halo 60x'), client as never, settings);
+    await d.setColor({ r: 255, g: 0, b: 0 }, 50);
+    expect(calls.at(-1)).toEqual({ action: 'set_cct', args: { cct: 2700, intensity: 500 } });
+  });
+
+  it('schickt an Vollfarb-Leuchten Farbe', async () => {
+    const { client, calls } = fakeClient(false);
+    const d = new AmaranDriver(light('Pano 60C'), client as never, settings);
+    await d.setColor({ r: 0, g: 0, b: 255 }, 100);
+    expect(calls.at(-1)).toMatchObject({ action: 'set_hsi', args: { hue: 240, sat: 100, intensity: 1000 } });
+  });
+
+  it('lernt bei unbekanntem Modell aus der Ablehnung', async () => {
+    const { client, calls } = fakeClient(true);
+    const d = new AmaranDriver(light('Studio links'), client as never, settings);
+    await d.setColor({ r: 0, g: 0, b: 255 }, 100);
+    expect(calls.slice(-2).map((c) => c.action)).toEqual(['set_hsi', 'set_cct']);
+    await d.setColor({ r: 0, g: 0, b: 255 }, 100);
+    expect(calls.at(-1)!.action).toBe('set_cct');
+    expect(d.colorMode()).toBe('cct');
+  });
+});

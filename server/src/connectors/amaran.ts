@@ -206,12 +206,45 @@ function itemName(it: Record<string, unknown> | string | number): string {
   return String(it.name ?? it.title ?? it.effect_name ?? it.effect_type ?? it.id ?? 'Effekt');
 }
 
+
+/**
+ * Bi-Color-Leuchten erkennen. amaran-Modellnamen: „…c“ = Vollfarbe (Pano 60C, 150c),
+ * „…x“ = Bi-Color (Halo 60x, COB 60x S), „…d“ = Tageslicht; Verge-Panels sind Bi-Color.
+ */
+export function guessAmaranColor(name: string): 'rgb' | 'cct' | 'unknown' {
+  const n = name.toLowerCase();
+  if (/\bverge\b/.test(n)) return 'cct';
+  if (/\b\d+\s*c\b|\bray\b|\bpixel\b|\bt[24]c\b|\bstar\s*c\b/.test(n)) return 'rgb';
+  if (/\b\d+\s*[xd]\b|\b\d+[xd]\s*s\b|\bhalo\b/.test(n)) return 'cct';
+  return 'unknown';
+}
+
+/** Farbe auf eine Farbtemperatur abbilden: Weiß → 5600 K, warme Farben bis 2700 K, kalte bis 6500 K */
+export function rgbToCct(c: Rgb, min = 2700, max = 6500): number {
+  const r = Math.max(0, Math.min(255, c.r)), b = Math.max(0, Math.min(255, c.b));
+  const neutral = Math.min(max, Math.max(min, 5600));
+  const k = r >= b ? neutral - ((r - b) / 255) * (neutral - min) : neutral + ((b - r) / 255) * (max - neutral);
+  return Math.round(k / 50) * 50;
+}
+
 /** Eine amaran-/Aputure-Leuchte über die Desktop-App. */
 export class AmaranDriver implements LightDriver {
   readonly capabilities: DriverCapabilities = { realtime: false, color: true, native: true };
   private awake: boolean | null = null;
 
+  /** im Betrieb gelernt: Leuchte lehnt Farbbefehle ab */
+  private learnedCct = false;
+
   constructor(readonly light: Light, private client: AmaranClient, private getSettings: () => Settings['amaran']) {}
+
+  /** Vollfarbe oder nur Weiß? Einstellung am Licht, sonst Modellname, sonst Vollfarbe mit Rückfall */
+  colorMode(): 'rgb' | 'cct' {
+    const set = this.light.config.amaranColor ?? 'auto';
+    if (set !== 'auto') return set;
+    if (this.learnedCct) return 'cct';
+    const guess = guessAmaranColor(`${this.light.config.deviceName ?? ''} ${this.light.name}`);
+    return guess === 'cct' ? 'cct' : 'rgb';
+  }
 
   private get node(): string {
     const n = this.light.config.nodeId;
@@ -231,7 +264,8 @@ export class AmaranDriver implements LightDriver {
     try {
       const sleep = await this.client.request('get_sleep', this.node);
       const asleep = sleep === true || (sleep as Record<string, unknown>)?.sleep === true;
-      return { ok: true, detail: `Node ${this.node} · ${asleep ? 'Standby' : 'an'} · Protokoll v${this.client.protocol}` };
+      const mode = this.colorMode() === 'cct' ? 'Bi-Color (Farben → Weißtöne)' : 'Vollfarbe';
+      return { ok: true, detail: `Node ${this.node} · ${mode} · ${asleep ? 'Standby' : 'an'}` };
     } catch (err) {
       return { ok: false, detail: (err as Error).message };
     }
@@ -292,12 +326,20 @@ export class AmaranDriver implements LightDriver {
 
   async setColor(c: Rgb, brightness: number): Promise<void> {
     await this.wake();
+    const intensity = this.scaleIntensity(brightness);
+    if (this.colorMode() === 'cct') {
+      await this.client.request('set_cct', this.node, { cct: rgbToCct(c), intensity });
+      return;
+    }
     const { h, s } = rgbToHsv(c);
-    await this.client.request('set_hsi', this.node, {
-      hue: Math.round(h),
-      sat: Math.round(s * 100),
-      intensity: this.scaleIntensity(brightness),
-    });
+    try {
+      await this.client.request('set_hsi', this.node, { hue: Math.round(h), sat: Math.round(s * 100), intensity });
+    } catch (err) {
+      // Bi-Color-Leuchte, die Farbe ablehnt: ab jetzt Weißtöne schicken
+      if ((this.light.config.amaranColor ?? 'auto') !== 'auto' || /nicht verbunden|keine Antwort|getrennt/.test((err as Error).message)) throw err;
+      this.learnedCct = true;
+      await this.client.request('set_cct', this.node, { cct: rgbToCct(c), intensity });
+    }
   }
 
   async listNative(): Promise<NativeEffect[]> {

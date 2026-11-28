@@ -209,7 +209,7 @@ function LightEditor({ light, onClose }: { light: Light; onClose: () => void }) 
         );
       } else if (l.connector === 'amaran') {
         const r = await api.get<Array<{ nodeId: string; name: string }>>('/api/discover/amaran');
-        setFound(r.map((d) => ({ label: d.name, detail: d.nodeId, apply: { nodeId: d.nodeId, name: d.name } })));
+        setFound(r.map((d) => ({ label: d.name, detail: d.nodeId, apply: { nodeId: d.nodeId, deviceName: d.name, name: d.name } })));
       }
     } catch (err) {
       run(() => Promise.reject(err));
@@ -334,9 +334,18 @@ function LightEditor({ light, onClose }: { light: Light; onClose: () => void }) 
           </Field>
         )}
         {l.connector === 'amaran' && (
-          <Field label="Node-ID">
-            <input value={l.config.nodeId ?? ''} onChange={(e) => setCfg({ nodeId: e.target.value.trim() })} />
-          </Field>
+          <>
+            <Field label="Node-ID">
+              <input value={l.config.nodeId ?? ''} onChange={(e) => setCfg({ nodeId: e.target.value.trim() })} />
+            </Field>
+            <Field label="Farbfähigkeit" hint="Bi-Color-Leuchten (z. B. Halo 60x, Verge) können nur Weiß: Farben werden zu warm- oder kaltweiß.">
+              <select value={l.config.amaranColor ?? 'auto'} onChange={(e) => setCfg({ amaranColor: e.target.value as 'auto' | 'rgb' | 'cct' })}>
+                <option value="auto">automatisch erkennen</option>
+                <option value="rgb">Vollfarbe (RGB)</option>
+                <option value="cct">nur Weiß (Bi-Color)</option>
+              </select>
+            </Field>
+          </>
         )}
         {l.connector === 'homeassistant' && (
           <Field label="Entität" hint="light.*, scene.* oder script.*">
